@@ -1,0 +1,21 @@
+{
+  "name": "voronoi-board-map-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A browser-based procedural board-game map generator using Voronoi cells, balanced biomes, sea corners, wobbly borders, and tile features.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "api": "node server/api-server.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "playwright-core": "^1.54.1",
+    "@napi-rs/canvas": "^0.1.68"
+  }
+}

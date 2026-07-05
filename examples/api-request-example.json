@@ -1,0 +1,43 @@
+{
+  "seed": "api-demo-42",
+  "tileCount": 56,
+  "wobble": 12,
+  "spread": 68,
+  "width": 1400,
+  "height": 900,
+  "shapeMode": "mainland",
+  "randomizeSeaCorners": true,
+  "centerLake": true,
+  "seaCorners": {
+    "NW": true,
+    "NE": true,
+    "SW": false,
+    "SE": true
+  },
+  "biomeTextureZooms": {
+    "forest": 125,
+    "grass": 95,
+    "field": 100,
+    "swamp": 115,
+    "mountain": 110,
+    "sea": 90
+  },
+  "buildingSettings": {
+    "averagePerTile": 0.35,
+    "maxPerTile": 2
+  },
+  "featureSettings": {
+    "magic": {
+      "count": 6,
+      "spread": 45
+    },
+    "mine": {
+      "count": 5,
+      "spread": 75
+    },
+    "cave": {
+      "count": 4,
+      "spread": 60
+    }
+  }
+}

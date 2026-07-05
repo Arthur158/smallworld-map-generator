@@ -1,0 +1,143 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #181818;
+  color: #f3f3f3;
+}
+
+body {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  height: 100vh;
+  overflow: hidden;
+}
+
+aside {
+  padding: 18px;
+  background: #242424;
+  border-right: 1px solid #444;
+  box-sizing: border-box;
+
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 12px;
+}
+
+p {
+  font-size: 13px;
+  color: #cfcfcf;
+  line-height: 1.4;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #ddd;
+}
+
+input,
+select,
+button {
+  margin-top: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  border: 1px solid #555;
+  background: #111;
+  color: #f3f3f3;
+  padding: 8px;
+}
+
+button {
+  cursor: pointer;
+  background: #3b66ff;
+  border-color: #6e8aff;
+  font-weight: 700;
+}
+
+button.secondary {
+  background: #333;
+  border-color: #666;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  margin-top: 6px;
+}
+
+.checks label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.checks input {
+  width: auto;
+  margin: 0;
+}
+
+main {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #333 0%, #111 75%);
+  height: 100vh;
+  min-width: 0;
+}
+
+canvas {
+  width: auto;
+  height: auto;
+
+  max-width: calc(100vw - 340px);
+  max-height: calc(100vh - 28px);
+
+  background: #84c9ff;
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.55);
+  border: 10px solid #111;
+  box-sizing: border-box;
+}
+
+.hint {
+  font-size: 12px;
+  color: #aaa;
+  margin-top: 12px;
+}
+
+code {
+  color: #fff;
+}
+
+
+h2 {
+  font-size: 14px;
+  margin: 20px 0 4px;
+  color: #f3f3f3;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 8px;
+  margin-top: 4px;
+}
+
+.feature-grid label {
+  margin-top: 8px;
+}

@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voronoi Board Map Generator</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <aside>
+    <h1>Voronoi board map generator</h1>
+
+    <p>
+      Procedural board-map draft: Voronoi land tiles, randomized sea corners,
+      optional central lake, balanced clustered biomes, wobbly borders, objects,
+      and magic/mine/cave symbols.
+    </p>
+
+    <label>
+      Seed
+      <input id="seed" value="deniz-42" />
+    </label>
+
+    <div class="row">
+      <label>
+        Tiles
+        <input id="tileCount" type="number" min="18" max="120" value="52" />
+      </label>
+
+      <label>
+        Border wobble
+        <input id="wobble" type="number" min="0" max="30" value="11" />
+      </label>
+    </div>
+
+    <h2>Tile shape</h2>
+
+      <label>
+        Tile chonkiness
+        <input id="tileChonkiness" type="range" min="0" max="100" step="5" value="60" />
+      </label>
+
+      <label>
+        Chonkiness passes
+        <input id="tileRepulsionSteps" type="number" min="0" max="12" step="1" value="5" />
+      </label>
+
+      <p class="hint">
+        Higher chonkiness spaces tile centers more evenly, making tiles rounder and easier to place pieces on.
+      </p>
+
+    <label>
+      Biome spread
+      <input id="spread" type="range" min="0" max="100" value="70" />
+    </label>
+    <p class="hint">
+      Low spread = scattered biomes. High spread = biomes gather into larger regions.
+    </p>
+
+    <h2>Water size</h2>
+
+      <div class="feature-grid">
+        <label>
+          Center lake size %
+          <input id="centerLakeSize" type="range" min="40" max="240" step="5" value="100" />
+        </label>
+
+        <label>
+          Sea size %
+          <input id="seaSize" type="range" min="40" max="240" step="5" value="100" />
+        </label>
+      </div>
+
+    <h2>Biome proportions</h2>
+      <p class="hint">
+        These are relative weights, not strict percentages. Equal values give roughly equal biome amounts.
+        Set a biome to 0 to almost remove it.
+      </p>
+
+      <div class="feature-grid">
+        <label>
+          Field weight
+          <input id="fieldBiomeWeight" type="range" min="0" max="300" step="5" value="100" />
+        </label>
+
+        <label>
+          Hill weight
+          <input id="grassBiomeWeight" type="range" min="0" max="300" step="5" value="100" />
+        </label>
+
+        <label>
+          Forest weight
+          <input id="forestBiomeWeight" type="range" min="0" max="300" step="5" value="100" />
+        </label>
+
+        <label>
+          Mountain weight
+          <input id="mountainBiomeWeight" type="range" min="0" max="300" step="5" value="100" />
+        </label>
+
+        <label>
+          Swamp weight
+          <input id="swampBiomeWeight" type="range" min="0" max="300" step="5" value="100" />
+        </label>
+      </div>
+
+    <h2>Biome texture zoom</h2>
+    <p class="hint">
+      Higher zoom means each tile uses a smaller crop from the biome image, so the pattern appears larger.
+      Lower zoom shows more of the source image inside each tile.
+    </p>
+
+    <div class="feature-grid">
+      <label>
+        Forest zoom %
+        <input id="forestTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+      <label>
+        Hill zoom %
+        <input id="grassTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+
+      <label>
+        Field zoom %
+        <input id="fieldTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+      <label>
+        Swamp zoom %
+        <input id="swampTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+
+      <label>
+        Mountain zoom %
+        <input id="mountainTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+      <label>
+        Sea/lake zoom %
+        <input id="seaTextureZoom" type="number" min="25" max="400" step="5" value="100" />
+      </label>
+    </div>
+
+    <h2>Feature symbols</h2>
+    <p class="hint">
+      Count controls how many icons are placed. Spread controls whether each icon type scatters or clusters.
+    </p>
+
+    <div class="feature-grid">
+      <label>
+        Magic count
+        <input id="magicCount" type="number" min="0" max="40" value="5" />
+      </label>
+      <label>
+        Magic spread
+        <input id="magicSpread" type="range" min="0" max="100" value="55" />
+      </label>
+
+      <label>
+        Mine count
+        <input id="mineCount" type="number" min="0" max="40" value="4" />
+      </label>
+      <label>
+        Mine spread
+        <input id="mineSpread" type="range" min="0" max="100" value="65" />
+      </label>
+
+      <label>
+        Cave count
+        <input id="caveCount" type="number" min="0" max="40" value="4" />
+      </label>
+      <label>
+        Cave spread
+        <input id="caveSpread" type="range" min="0" max="100" value="60" />
+      </label>
+    </div>
+
+    <div class="feature-grid">
+      <label>
+        average per tile
+        <input id="buildingAveragePerTile" type="number" min="0" max="5" step="0.05" value="0.28" />
+      </label>
+
+      <label>
+        max per tile
+        <input id="maxBuildingsPerTile" type="number" min="0" max="5" value="1" />
+      </label>
+
+      <label>
+        Building size multiplier
+        <input id="buildingSizeMultiplier" type="number" min="0.2" max="3" step="0.05" value="1" />
+      </label>
+    </div>
+
+    <h2>Water layout</h2>
+    <label><input id="randomizeSeaCorners" type="checkbox" /> Randomize sea corners each generation</label>
+    <p class="hint">
+      When randomization is on, the number of checked corner boxes below decides how many sea corners are chosen.
+      If none are checked, it defaults to 2 random sea corners.
+    </p>
+
+    <label>Sea corner pool</label>
+    <div class="checks">
+      <label><input id="seaNW" type="checkbox" checked /> NW</label>
+      <label><input id="seaNE" type="checkbox" /> NE</label>
+      <label><input id="seaSW" type="checkbox" checked /> SW</label>
+      <label><input id="seaSE" type="checkbox" checked /> SE</label>
+    </div>
+
+    <label><input id="centerLake" type="checkbox" /> Add central lake (larger water tile)</label>
+    <p class="hint">
+      The center lake reserves one larger water tile, roughly 1.3× the size of a typical tile.
+    </p>
+
+    <label>
+      Map shape
+      <select id="shapeMode">
+        <option value="mainland">Mainland/coast</option>
+        <option value="islands">Floating islands-ish</option>
+      </select>
+    </label>
+
+    <button id="generate">Generate map</button>
+    <button id="randomSeed" class="secondary">Random seed</button>
+
+    <h2>Exports</h2>
+    <button id="exportPng" class="secondary">Export PNG</button>
+    <button id="exportMetadataJson" class="secondary">Export full metadata JSON</button>
+    <button id="exportGoServerMap" class="secondary">Export Go server map</button>
+    <button id="exportGraphicsJs" class="secondary">Export graphics JS</button>
+
+    <p class="hint">
+      Tip: inspect <code>window.lastGeneratedMap</code>, <code>window.lastMapMetadata</code>, or
+      <code>window.lastWaterPlan</code> in the browser console.
+    </p>
+  </aside>
+
+  <main>
+    <canvas id="map" width="1400" height="900"></canvas>
+  </main>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
