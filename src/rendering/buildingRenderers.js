@@ -2,7 +2,6 @@ import { hash01 } from "../rng.js";
 import { polygonCentroid } from "../geometry/polygon.js";
 import { getBuildingRenderSize } from "./buildingSizeRegistry.js";
 
-// const DEFAULT_BUILDING_SIZE = 46;
 const BORDER_MARGIN = 5;
 const STACK_MARGIN = 6;
 const BUILDING_PLACEMENT_SIZE = 24;
@@ -59,24 +58,6 @@ function rectInsidePolygon(position, size, polygon) {
   return rectSamplePoints(rect).every((point) => pointInPolygon(point, polygon));
 }
 
-function rectsOverlap(a, b) {
-  return !(
-    a.x + a.width < b.x ||
-    b.x + b.width < a.x ||
-    a.y + a.height < b.y ||
-    b.y + b.height < a.y
-  );
-}
-
-function expandRect(rect, margin) {
-  return {
-    x: rect.x - margin,
-    y: rect.y - margin,
-    width: rect.width + margin * 2,
-    height: rect.height + margin * 2,
-  };
-}
-
 function circleOverlapsRect(circle, rect) {
   const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
   const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
@@ -106,9 +87,8 @@ function makeCandidatePositions(centroid, size, index, total, seed, cellId) {
   const phase =
     hash01(seed, "building-phase", cellId, index, total) * Math.PI * 2;
 
-  // These are placement offsets from the tile center.
-  // They are intentionally not based too strongly on rendered image size,
-  // otherwise big buildings become almost impossible to place.
+  // Placement offsets from tile center. Intentionally not based strongly on
+  // rendered image size, otherwise large buildings get rejected everywhere.
   const rings = [30, 44, 58, 74];
 
   for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
@@ -145,18 +125,15 @@ function findBuildingPlacement(
   buildingSettings = {},
 ) {
   const rawSizeMultiplier = Number(buildingSettings?.sizeMultiplier ?? 1);
-  console.log("multpiler:")
-  console.log(rawSizeMultiplier)
   const sizeMultiplier = Number.isFinite(rawSizeMultiplier)
     ? Math.max(0.2, Math.min(3, rawSizeMultiplier))
     : 1;
 
-  // This is the actual visual size used when drawing the image.
   const renderSize =
     getBuildingRenderSize(filename, building.scale ?? 1) * sizeMultiplier;
 
-  // This is only used to decide whether the building position is valid.
-  // Keep it small, otherwise large images like cities/towers get rejected everywhere.
+  // Used only to decide whether the building position is valid. Keep small so
+  // artwork can intentionally overlap borders and scenery.
   const placementSizes = [
     BUILDING_PLACEMENT_SIZE,
     BUILDING_PLACEMENT_SIZE * 0.85,
@@ -182,8 +159,6 @@ function findBuildingPlacement(
       );
 
       if (distanceFromCenter < minDistanceFromCenter) continue;
-
-      // Important: validate only the placement footprint, not the whole artwork.
       if (!rectInsidePolygon(candidate, placementSize, poly)) continue;
       if (overlapsReservedLayout(candidate, placementSize, layout)) continue;
 
@@ -197,13 +172,21 @@ function findBuildingPlacement(
   return null;
 }
 
-export function drawBuildings(ctx, cell, poly, seed, buildingTextures = {}, layout = null, buildingSettings = {}) {
-  if (!cell.buildings?.length) return;
+export function getBuildingDrawItems(
+  cell,
+  poly,
+  seed,
+  buildingTextures = {},
+  layout = null,
+  buildingSettings = {},
+) {
+  if (!cell.buildings?.length) return [];
 
   const images = buildingTextures[cell.biome] ?? [];
-  if (!images.length) return;
+  if (!images.length) return [];
 
   const centroid = polygonCentroid(poly);
+  const items = [];
 
   cell.buildings.forEach((building, index) => {
     const imageIndex = Math.floor(
@@ -211,8 +194,10 @@ export function drawBuildings(ctx, cell, poly, seed, buildingTextures = {}, layo
     );
 
     const asset = images[Math.min(imageIndex, images.length - 1)];
-    const image = asset.image ?? asset;
-    const filename = asset.name;
+    const image = asset?.image ?? asset;
+    const filename = asset?.name;
+
+    if (!image) return;
 
     const placement = findBuildingPlacement(
       poly,
@@ -231,17 +216,56 @@ export function drawBuildings(ctx, cell, poly, seed, buildingTextures = {}, layo
 
     const { position, size } = placement;
 
-    ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 4;
-    ctx.drawImage(
+    items.push({
+      kind: "building",
+      cellId: cell.id,
       image,
-      position.x - size / 2,
-      position.y - size / 2,
+      x: position.x,
+      y: position.y,
       size,
-      size,
-    );
-    ctx.restore();
+      // Sort by visual baseline. This lets buildings sit in front of trees
+      // behind them, but behind trees/mountains lower in the tile.
+      z: position.y + size * 0.28,
+    });
   });
+
+  return items;
+}
+
+export function drawBuildingItem(ctx, item) {
+  ctx.save();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 4;
+  ctx.drawImage(
+    item.image,
+    item.x - item.size / 2,
+    item.y - item.size / 2,
+    item.size,
+    item.size,
+  );
+  ctx.restore();
+}
+
+export function drawBuildings(
+  ctx,
+  cell,
+  poly,
+  seed,
+  buildingTextures = {},
+  layout = null,
+  buildingSettings = {},
+) {
+  const items = getBuildingDrawItems(
+    cell,
+    poly,
+    seed,
+    buildingTextures,
+    layout,
+    buildingSettings,
+  );
+
+  for (const item of items) {
+    drawBuildingItem(ctx, item);
+  }
 }

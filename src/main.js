@@ -1,9 +1,9 @@
-
 import { makeMap } from "./generation/mapGenerator.js";
 import { renderMap } from "./rendering/renderMap.js";
 import { loadBiomeTextures } from "./rendering/biomeTextures.js";
 import { loadFeatureIcons } from "./rendering/icons.js";
 import { loadBuildingTextures } from "./rendering/buildingTextures.js";
+import { loadSceneryTextures } from "./rendering/sceneryTextures.js";
 import {
   createMapMetadata,
   generateGoMapFunction,
@@ -16,6 +16,7 @@ const ctx = canvas.getContext("2d");
 let biomeTextures = {};
 let featureIcons = {};
 let buildingTextures = {};
+let sceneryTextures = {};
 let lastCells = [];
 let lastConfig = null;
 let lastMetadata = null;
@@ -33,6 +34,10 @@ export const DEFAULT_SETTINGS = {
   waterSettings: {
     centerLakeSize: 100,
     seaSize: 100,
+  },
+  scenerySettings: {
+    forestTreeSize: 100,
+    mountainObjectSize: 100,
   },
   biomeWeights: {
     field: 100,
@@ -91,8 +96,6 @@ function deepMerge(base, patch) {
   const result = { ...clone(base) };
 
   for (const [key, value] of Object.entries(patch)) {
-    // If a UI field is missing, keep the default value instead of overwriting
-    // it with undefined.
     if (value === undefined) continue;
 
     if (
@@ -133,7 +136,7 @@ function unwrapSettings(input = {}) {
 }
 
 function normalizeSettings(input = {}) {
-  const merged = deepMerge(DEFAULT_SETTINGS, input);
+  const merged = deepMerge(DEFAULT_SETTINGS, unwrapSettings(input));
 
   return {
     seed: String(merged.seed || DEFAULT_SETTINGS.seed),
@@ -173,37 +176,26 @@ function normalizeSettings(input = {}) {
         240,
       ),
     },
+    scenerySettings: {
+      forestTreeSize: clampNumber(
+        merged.scenerySettings?.forestTreeSize,
+        DEFAULT_SETTINGS.scenerySettings.forestTreeSize,
+        30,
+        220,
+      ),
+      mountainObjectSize: clampNumber(
+        merged.scenerySettings?.mountainObjectSize,
+        DEFAULT_SETTINGS.scenerySettings.mountainObjectSize,
+        35,
+        240,
+      ),
+    },
     biomeWeights: {
-      field: clampNumber(
-        merged.biomeWeights?.field,
-        DEFAULT_SETTINGS.biomeWeights.field,
-        0,
-        300,
-      ),
-      grass: clampNumber(
-        merged.biomeWeights?.grass,
-        DEFAULT_SETTINGS.biomeWeights.grass,
-        0,
-        300,
-      ),
-      forest: clampNumber(
-        merged.biomeWeights?.forest,
-        DEFAULT_SETTINGS.biomeWeights.forest,
-        0,
-        300,
-      ),
-      mountain: clampNumber(
-        merged.biomeWeights?.mountain,
-        DEFAULT_SETTINGS.biomeWeights.mountain,
-        0,
-        300,
-      ),
-      swamp: clampNumber(
-        merged.biomeWeights?.swamp,
-        DEFAULT_SETTINGS.biomeWeights.swamp,
-        0,
-        300,
-      ),
+      field: clampNumber(merged.biomeWeights?.field, DEFAULT_SETTINGS.biomeWeights.field, 0, 300),
+      grass: clampNumber(merged.biomeWeights?.grass, DEFAULT_SETTINGS.biomeWeights.grass, 0, 300),
+      forest: clampNumber(merged.biomeWeights?.forest, DEFAULT_SETTINGS.biomeWeights.forest, 0, 300),
+      mountain: clampNumber(merged.biomeWeights?.mountain, DEFAULT_SETTINGS.biomeWeights.mountain, 0, 300),
+      swamp: clampNumber(merged.biomeWeights?.swamp, DEFAULT_SETTINGS.biomeWeights.swamp, 0, 300),
     },
     biomeTextureZooms: {
       forest: clampNumber(merged.biomeTextureZooms?.forest, DEFAULT_SETTINGS.biomeTextureZooms.forest, 25, 400),
@@ -214,10 +206,26 @@ function normalizeSettings(input = {}) {
       sea: clampNumber(merged.biomeTextureZooms?.sea, DEFAULT_SETTINGS.biomeTextureZooms.sea, 25, 400),
     },
     buildingSettings: {
-      averagePerTile: clampNumber(merged.buildingSettings?.averagePerTile, DEFAULT_SETTINGS.buildingSettings.averagePerTile, 0, 5),
-      maxPerTile: Math.round(clampNumber(merged.buildingSettings?.maxPerTile, DEFAULT_SETTINGS.buildingSettings.maxPerTile, 0, 5)),
-      sizeMultiplier: clampNumber(merged.buildingSettings?.sizeMultiplier, DEFAULT_SETTINGS.buildingSettings.sizeMultiplier, 0.2, 3),
-      // sizeMultiplier: merged.buildingSettings?.sizeMultiplier
+      averagePerTile: clampNumber(
+        merged.buildingSettings?.averagePerTile,
+        DEFAULT_SETTINGS.buildingSettings.averagePerTile,
+        0,
+        5,
+      ),
+      maxPerTile: Math.round(
+        clampNumber(
+          merged.buildingSettings?.maxPerTile,
+          DEFAULT_SETTINGS.buildingSettings.maxPerTile,
+          0,
+          5,
+        ),
+      ),
+      sizeMultiplier: clampNumber(
+        merged.buildingSettings?.sizeMultiplier,
+        DEFAULT_SETTINGS.buildingSettings.sizeMultiplier,
+        0.2,
+        3,
+      ),
     },
     featureSettings: {
       magic: {
@@ -241,18 +249,20 @@ function normalizeSettings(input = {}) {
     },
     randomizeSeaCorners: Boolean(merged.randomizeSeaCorners),
     centerLake: Boolean(merged.centerLake),
+  };
+}
+
+function makeRenderableConfig(settings) {
+  return {
+    ...settings,
     biomeTextures,
     featureIcons,
     buildingTextures,
+    sceneryTextures,
   };
 }
 
 function readSettingsFromDom() {
-  console.log("[raw building DOM values]", {
-    averagePerTile: document.getElementById("buildingAveragePerTile")?.value,
-    maxPerTile: document.getElementById("maxBuildingsPerTile")?.value,
-    sizeMultiplier: document.getElementById("buildingSizeMultiplier")?.value,
-  });
   return normalizeSettings({
     seed: document.getElementById("seed")?.value,
     tileCount: document.getElementById("tileCount")?.value,
@@ -268,6 +278,10 @@ function readSettingsFromDom() {
     waterSettings: {
       centerLakeSize: document.getElementById("centerLakeSize")?.value,
       seaSize: document.getElementById("seaSize")?.value,
+    },
+    scenerySettings: {
+      forestTreeSize: document.getElementById("forestTreeSize")?.value,
+      mountainObjectSize: document.getElementById("mountainObjectSize")?.value,
     },
     biomeWeights: {
       field: document.getElementById("fieldBiomeWeight")?.value,
@@ -338,6 +352,9 @@ function syncDomFromSettings(settings) {
   setValue("centerLakeSize", settings.waterSettings.centerLakeSize);
   setValue("seaSize", settings.waterSettings.seaSize);
 
+  setValue("forestTreeSize", settings.scenerySettings.forestTreeSize);
+  setValue("mountainObjectSize", settings.scenerySettings.mountainObjectSize);
+
   setValue("fieldBiomeWeight", settings.biomeWeights.field);
   setValue("grassBiomeWeight", settings.biomeWeights.grass);
   setValue("forestBiomeWeight", settings.biomeWeights.forest);
@@ -392,20 +409,30 @@ function exposeGeneratedData(cells, metadata) {
 async function ensureAssetsReady() {
   if (assetsReady) return;
 
-  [biomeTextures, featureIcons, buildingTextures] = await Promise.all([
+  [biomeTextures, featureIcons, buildingTextures, sceneryTextures] = await Promise.all([
     loadBiomeTextures(),
     loadFeatureIcons(),
     loadBuildingTextures(),
+    loadSceneryTextures(),
   ]);
 
   assetsReady = true;
+}
+
+function stripRuntimeAssets(config) {
+  return clone({
+    ...config,
+    biomeTextures: undefined,
+    featureIcons: undefined,
+    buildingTextures: undefined,
+    sceneryTextures: undefined,
+  });
 }
 
 export async function generateFromSettings(inputSettings = {}, options = {}) {
   await ensureAssetsReady();
 
   const settings = normalizeSettings(unwrapSettings(inputSettings));
-  console.log("[generator] building settings used:", settings.buildingSettings);
 
   if (options.syncDom !== false) {
     syncDomFromSettings(settings);
@@ -414,25 +441,16 @@ export async function generateFromSettings(inputSettings = {}, options = {}) {
     canvas.height = settings.height;
   }
 
-  lastConfig = settings;
-  lastCells = makeMap(settings);
-  console.log(
-  "[generator] buildings generated:",
-  lastCells.reduce((sum, cell) => sum + (cell.buildings?.length ?? 0), 0),
-  );
-  lastMetadata = createMapMetadata(lastCells, settings);
+  lastConfig = makeRenderableConfig(settings);
+  lastCells = makeMap(lastConfig);
+  lastMetadata = createMapMetadata(lastCells, lastConfig);
 
-  renderMap(ctx, lastCells, settings);
+  renderMap(ctx, lastCells, lastConfig);
   exposeGeneratedData(lastCells, lastMetadata);
 
   return {
     imageDataUrl: canvas.toDataURL("image/png"),
-    settings: clone({
-      ...settings,
-      biomeTextures: undefined,
-      featureIcons: undefined,
-      buildingTextures: undefined,
-    }),
+    settings: stripRuntimeAssets(lastConfig),
     metadata: lastMetadata,
     exports: {
       goServerMap: generateGoMapFunction(lastMetadata, "GeneratedMap"),

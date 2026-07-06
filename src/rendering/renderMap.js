@@ -5,9 +5,12 @@ import {
   traceSmoothOpenPath,
 } from "../geometry/polygon.js";
 import { computeTileLayout } from "../export/mapMetadata.js";
-import { drawBiome } from "./biomeRenderers.js";
+import { drawBiomeBase } from "./biomeRenderers.js";
 import { drawFeatureIcon } from "./icons.js";
-import { drawBuildings } from "./buildingRenderers.js";
+import {
+  collectTileObjectDrawItems,
+  drawTileObjectItem,
+} from "./tileObjectRenderers.js";
 
 function drawBackground(ctx, config) {
   const { width, height, seed } = config;
@@ -57,7 +60,6 @@ function drawCurvedBorderNetwork(ctx, edgePaths) {
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
 
-  // Pass 1: soft dark brown under-border
   ctx.strokeStyle = "rgba(70, 38, 22, 0.62)";
   ctx.lineWidth = 9;
   ctx.shadowColor = "rgba(40, 22, 14, 0.38)";
@@ -66,18 +68,38 @@ function drawCurvedBorderNetwork(ctx, edgePaths) {
   ctx.shadowOffsetY = 1;
   strokeEdgeSet(ctx, edgePaths);
 
-  // Pass 2: main warm white border
   ctx.shadowColor = "transparent";
   ctx.strokeStyle = "rgba(252, 249, 243, 0.98)";
   ctx.lineWidth = 4.3;
   strokeEdgeSet(ctx, edgePaths);
 
-  // Pass 3: thin inner dark hairline
-  // ctx.strokeStyle = "rgba(82, 69, 63, 0.55)";
-  // ctx.lineWidth = 1.0;
-  // strokeEdgeSet(ctx, edgePaths);
-
   ctx.restore();
+}
+
+function collectAllTileObjectItems(drawnCells, layouts, config) {
+  const items = [];
+
+  drawnCells.forEach((item, index) => {
+    items.push(
+      ...collectTileObjectDrawItems({
+        cell: item.cell,
+        poly: item.poly,
+        seed: config.seed,
+        buildingTextures: config.buildingTextures,
+        sceneryTextures: config.sceneryTextures,
+        layout: layouts[index],
+        buildingSettings: config.buildingSettings,
+        scenerySettings: config.scenerySettings,
+      }),
+    );
+  });
+
+  items.sort((a, b) => {
+    if (a.z !== b.z) return a.z - b.z;
+    return String(a.cellId).localeCompare(String(b.cellId));
+  });
+
+  return items;
 }
 
 export function renderMap(ctx, cells, config) {
@@ -102,23 +124,28 @@ export function renderMap(ctx, cells, config) {
   }
 
   for (const item of drawnCells) {
-    drawBiome(ctx, item.cell, item.poly, seed, config.biomeTextures, config.biomeTextureZooms);
-  }
-
-  drawCurvedBorderNetwork(ctx, edgePaths);
-
-  for (const item of drawnCells) {
-    const layout = computeTileLayout(item.poly, item.cell);
-
-    drawBuildings(
+    drawBiomeBase(
       ctx,
       item.cell,
       item.poly,
       seed,
-      config.buildingTextures,
-      layout,
-      config.buildingSettings,
+      config.biomeTextures,
+      config.biomeTextureZooms,
     );
+  }
+
+  drawCurvedBorderNetwork(ctx, edgePaths);
+
+  const layouts = drawnCells.map((item) => computeTileLayout(item.poly, item.cell));
+  const objectItems = collectAllTileObjectItems(drawnCells, layouts, config);
+
+  for (const objectItem of objectItems) {
+    drawTileObjectItem(ctx, objectItem);
+  }
+
+  for (let i = 0; i < drawnCells.length; i++) {
+    const item = drawnCells[i];
+    const layout = layouts[i];
 
     if (item.cell.feature && layout.featureIcon) {
       drawFeatureIcon(

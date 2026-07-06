@@ -19,7 +19,7 @@ function getBiomeTextureZoom(cell, biomeTextureZooms) {
   return clamp(zoomPercent, 25, 400) / 100;
 }
 
-function polygonBounds(poly) {
+export function polygonBounds(poly) {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -37,6 +37,10 @@ function polygonBounds(poly) {
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
+    minX,
+    minY,
+    maxX,
+    maxY,
   };
 }
 
@@ -54,6 +58,13 @@ function fillAndClip(ctx, poly, fill) {
   clipToTile(ctx, poly);
 }
 
+function getImageDimensions(image) {
+  return {
+    width: image.naturalWidth || image.width,
+    height: image.naturalHeight || image.height,
+  };
+}
+
 function drawImageTexture(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms) {
   const images = biomeTextures?.[cell.biome] ?? [];
 
@@ -65,10 +76,14 @@ function drawImageTexture(ctx, cell, poly, seed, biomeTextures, biomeTextureZoom
     hash01(seed, "texture-image", cell.biome, cell.id) * images.length,
   );
 
-  const image = images[Math.min(imageIndex, images.length - 1)];
+  const asset = images[Math.min(imageIndex, images.length - 1)];
+  const image = asset?.image ?? asset;
 
-  const imageWidth = image.naturalWidth || image.width;
-  const imageHeight = image.naturalHeight || image.height;
+  if (!image) return false;
+
+  const { width: imageWidth, height: imageHeight } = getImageDimensions(image);
+
+  if (!imageWidth || !imageHeight) return false;
 
   const zoom = getBiomeTextureZoom(cell, biomeTextureZooms);
   const desiredCropSize = DEFAULT_TEXTURE_CROP_SIZE / zoom;
@@ -248,7 +263,34 @@ export function drawSea(ctx, cell, poly, seed) {
   ctx.restore();
 }
 
-export function drawBiome(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms) {
+function drawHillBase(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms) {
+  const hillCell = { ...cell, biome: "grass" };
+
+  if (drawImageTexture(ctx, hillCell, poly, seed, biomeTextures, biomeTextureZooms)) {
+    return;
+  }
+
+  drawGrass(ctx, hillCell, poly, seed);
+}
+
+export function drawBiomeBase(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms) {
+  // Forest keeps the readable hill/grass base while the trees are drawn later.
+  if (cell.biome === "forest") {
+    drawHillBase(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms);
+    return;
+  }
+
+  // Mountains go back to using the original mountain biome background.
+  // The layered mountain sprites are drawn afterwards on top of that base.
+  if (cell.biome === "mountain") {
+    if (drawImageTexture(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms)) {
+      return;
+    }
+
+    drawMountain(ctx, cell, poly, seed);
+    return;
+  }
+
   // Preferred path: use an image from src/assets/images/<biome>/.
   // A deterministic random crop is selected per tile.
   if (drawImageTexture(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms)) {
@@ -262,4 +304,9 @@ export function drawBiome(ctx, cell, poly, seed, biomeTextures, biomeTextureZoom
   if (cell.biome === "mountain") drawMountain(ctx, cell, poly, seed);
   if (cell.biome === "swamp") drawSwamp(ctx, cell, poly, seed);
   if (cell.biome === "sea") drawSea(ctx, cell, poly, seed);
+}
+
+// Kept for older imports.
+export function drawBiome(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms) {
+  drawBiomeBase(ctx, cell, poly, seed, biomeTextures, biomeTextureZooms);
 }

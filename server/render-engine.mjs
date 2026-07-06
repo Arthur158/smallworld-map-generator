@@ -38,6 +38,11 @@ export const DEFAULT_SETTINGS = {
     seaSize: 100,
   },
 
+  scenerySettings: {
+    forestTreeSize: 100,
+    mountainObjectSize: 100,
+  },
+
   biomeWeights: {
     field: 100,
     grass: 100,
@@ -228,6 +233,22 @@ export function normalizeSettings(input = {}) {
         merged.waterSettings?.seaSize,
         DEFAULT_SETTINGS.waterSettings.seaSize,
         40,
+        240,
+      ),
+    },
+
+    scenerySettings: {
+      forestTreeSize: clampNumber(
+        merged.scenerySettings?.forestTreeSize,
+        DEFAULT_SETTINGS.scenerySettings.forestTreeSize,
+        30,
+        220,
+      ),
+
+      mountainObjectSize: clampNumber(
+        merged.scenerySettings?.mountainObjectSize,
+        DEFAULT_SETTINGS.scenerySettings.mountainObjectSize,
+        35,
         240,
       ),
     },
@@ -516,6 +537,46 @@ async function loadGroupedImageAssets(baseDir) {
   return grouped;
 }
 
+async function loadSceneryTextures(baseAssetsDir) {
+  const forestDirs = [
+    path.join(baseAssetsDir, "forests"),
+    // Also support singular `assets/forest/...` in case assets are copied there.
+    path.join(baseAssetsDir, "forest"),
+  ];
+  const mountainsDir = path.join(baseAssetsDir, "mountains");
+
+  const forests = {
+    pine: [],
+    normal: [],
+  };
+
+  for (const forestsDir of forestDirs) {
+    for (const file of await collectImageFiles(forestsDir)) {
+      const relativeParts = path.relative(forestsDir, file).split(path.sep);
+      const group = relativeParts[0] === "pine" ? "pine" : "normal";
+
+      forests[group].push({
+        name: path.basename(file),
+        image: await loadImage(file),
+      });
+    }
+  }
+
+  const mountains = [];
+
+  for (const file of await collectImageFiles(mountainsDir)) {
+    mountains.push({
+      name: path.basename(file),
+      image: await loadImage(file),
+    });
+  }
+
+  return {
+    forests,
+    mountains,
+  };
+}
+
 async function loadRequiredImage(file) {
   try {
     return await loadImage(file);
@@ -540,10 +601,11 @@ export async function loadRuntimeAssets() {
   const buildingsDir = path.join(ASSETS_DIR, "buildings");
   const iconsDir = path.join(ASSETS_DIR, "icons");
 
-  const [biomeTextures, buildingTextures, cave, magic, mine] =
+  const [biomeTextures, buildingTextures, sceneryTextures, cave, magic, mine] =
     await Promise.all([
       loadGroupedImages(imagesDir),
       loadGroupedImageAssets(buildingsDir),
+      loadSceneryTextures(ASSETS_DIR),
       loadRequiredImage(path.join(iconsDir, "cave.png")),
       loadRequiredImage(path.join(iconsDir, "magic.png")),
       loadRequiredImage(path.join(iconsDir, "mine.png")),
@@ -552,6 +614,7 @@ export async function loadRuntimeAssets() {
   assetCache = {
     biomeTextures,
     buildingTextures,
+    sceneryTextures,
     featureIcons: {
       cave,
       magic,
@@ -567,6 +630,7 @@ function makeRenderableConfig(settings, assets) {
     ...settings,
     biomeTextures: assets.biomeTextures,
     buildingTextures: assets.buildingTextures,
+    sceneryTextures: assets.sceneryTextures,
     featureIcons: assets.featureIcons,
   };
 }

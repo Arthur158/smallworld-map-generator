@@ -139,6 +139,26 @@
       </label>
     </div>
 
+
+    <h2>Forest / mountain object layers</h2>
+    <p class="hint">
+      Forest tiles now start as hill tiles and draw tree sprites from
+      <code>src/assets/forests/pine</code> or <code>src/assets/forests/normal</code>.
+      Mountain tiles do the same with <code>src/assets/mountains</code>. Bigger objects automatically mean lower density.
+    </p>
+
+    <div class="feature-grid">
+      <label>
+        Forest tree size %
+        <input id="forestTreeSize" type="range" min="30" max="220" step="5" value="100" />
+      </label>
+
+      <label>
+        Mountain object size %
+        <input id="mountainObjectSize" type="range" min="35" max="240" step="5" value="100" />
+      </label>
+    </div>
+
     <h2>Feature symbols</h2>
     <p class="hint">
       Count controls how many icons are placed. Spread controls whether each icon type scatters or clusters.
