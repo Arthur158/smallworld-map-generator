@@ -28,17 +28,17 @@ export const BIOMES = {
 
 export const FEATURE_RULES = {
   magic: {
-    allowedBiomes: ["forest", "grass", "field"],
+    allowedBiomes: ["forest", "grass", "field", "swamp", "mountain"],
     defaultCount: 5,
     defaultSpread: 55,
   },
   mine: {
-    allowedBiomes: ["mountain", "swamp"],
+    allowedBiomes: ["forest", "grass", "field", "swamp", "mountain"],
     defaultCount: 4,
     defaultSpread: 65,
   },
   cave: {
-    allowedBiomes: ["mountain", "forest"],
+    allowedBiomes: ["forest", "grass", "field", "swamp", "mountain"],
     defaultCount: 4,
     defaultSpread: 60,
   },

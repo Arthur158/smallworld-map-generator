@@ -7,6 +7,8 @@ const buildingModules = import.meta.glob(
   },
 );
 
+const FEATURE_BUILDING_FOLDERS = new Set(["magic", "mine", "cave"]);
+
 function loadImage(src) {
   return new Promise((resolve, reject) => {
     const image = new Image();
@@ -16,7 +18,7 @@ function loadImage(src) {
   });
 }
 
-function getBiomeFromPath(path) {
+function getBuildingInfoFromPath(path) {
   const parts = path.split("/");
   const buildingsIndex = parts.indexOf("buildings");
 
@@ -24,17 +26,40 @@ function getBiomeFromPath(path) {
     return null;
   }
 
-  return parts[buildingsIndex + 1];
+  const biome = parts[buildingsIndex + 1];
+  const maybeFeature = parts[buildingsIndex + 2];
+
+  return {
+    biome,
+    feature: FEATURE_BUILDING_FOLDERS.has(maybeFeature) ? maybeFeature : null,
+  };
+}
+
+function createBuildingTextureGroup() {
+  return {
+    default: [],
+    magic: [],
+    mine: [],
+    cave: [],
+  };
+}
+
+function ensureBuildingTextureGroup(textures, biome) {
+  if (!textures[biome]) {
+    textures[biome] = createBuildingTextureGroup();
+  }
+
+  return textures[biome];
 }
 
 export async function loadBuildingTextures() {
   const entries = await Promise.all(
     Object.entries(buildingModules).map(async ([path, src]) => {
-      const biome = getBiomeFromPath(path);
-      if (!biome) return null;
+      const info = getBuildingInfoFromPath(path);
+      if (!info) return null;
 
       return {
-        biome,
+        ...info,
         name: path.split("/").pop(),
         src,
         image: await loadImage(src),
@@ -46,11 +71,15 @@ export async function loadBuildingTextures() {
 
   for (const entry of entries) {
     if (!entry) continue;
-    if (!textures[entry.biome]) textures[entry.biome] = [];
-      textures[entry.biome].push({
-        name: entry.name,
-        image: entry.image,
-      });
+
+    const group = ensureBuildingTextureGroup(textures, entry.biome);
+    const bucket = entry.feature ?? "default";
+
+    group[bucket].push({
+      name: entry.name,
+      image: entry.image,
+      feature: entry.feature,
+    });
   }
 
   return textures;

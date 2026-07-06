@@ -157,17 +157,64 @@ function getMaxBuildingsPerTile(config) {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 1;
 }
 
+function getSymbolBuildingChance(config) {
+  const value = Number(config.buildingSettings?.symbolBuildingChance ?? 100);
+  const safe = Number.isFinite(value) ? value : 100;
+
+  return clamp(safe, 0, 100) / 100;
+}
+
 function getBuildingCandidateCells(land) {
   // Water is already removed. Keep buildings off special water-like/empty cases here.
   return land.filter((cell) => ["field", "grass", "forest", "mountain", "swamp"].includes(cell.biome));
 }
 
-function makeBuilding(cell, seed, slot) {
+function makeBuilding(cell, seed, slot, feature = null, required = false) {
+  const featurePart = feature ? `${feature}-` : "";
+
   return {
-    id: `${cell.id}-building-${slot}`,
+    id: `${cell.id}-${featurePart}building-${slot}`,
     biome: cell.biome,
-    scale: 0.82 + hash01(seed, "building-scale", cell.id, slot) * 0.28,
+
+    // For symbol tiles, the renderer will first search in:
+    // src/assets/buildings/<biome>/<feature>/
+    // Example: src/assets/buildings/grass/magic/
+    feature,
+
+    // Required buildings are created for selected symbol tiles. Their proportion
+    // is controlled by buildingSettings.symbolBuildingChance.
+    required,
+
+    scale:
+      0.82 +
+      hash01(seed, "building-scale", cell.id, feature ?? "plain", slot) * 0.28,
   };
+}
+
+function assignSymbolFeatureBuildings(land, config) {
+  const symbolCells = land.filter((cell) => cell.feature);
+  const chance = getSymbolBuildingChance(config);
+
+  if (!symbolCells.length || chance <= 0) return;
+
+  const totalSymbolBuildings = Math.min(
+    symbolCells.length,
+    Math.round(symbolCells.length * chance),
+  );
+
+  const selected = [...symbolCells]
+    .sort(
+      (a, b) =>
+        hash01(config.seed, "symbol-building-tile", a.id, a.feature) -
+        hash01(config.seed, "symbol-building-tile", b.id, b.feature),
+    )
+    .slice(0, totalSymbolBuildings);
+
+  for (const cell of selected) {
+    cell.buildings.push(
+      makeBuilding(cell, config.seed, `symbol-${cell.feature}`, cell.feature, true),
+    );
+  }
 }
 
 function assignBuildings(cells, config) {
@@ -181,15 +228,32 @@ function assignBuildings(cells, config) {
     cell.object = null;
   }
 
-  if (!land.length || averagePerTile <= 0 || maxPerTile <= 0) return;
+  if (!land.length) return;
+
+  // Symbol tiles use a separate percentage slider.
+  assignSymbolFeatureBuildings(land, config);
+
+  // averagePerTile controls ordinary biome buildings.
+  //
+  // It applies to:
+  // - tiles without a symbol
+  // - symbol tiles that did NOT get a symbol-specific building
+  //
+  // It does NOT apply to symbol tiles that already received their special
+  // magic/mine/cave building.
+  const plainLand = land.filter(
+    (cell) => !cell.feature || !cell.buildings?.length,
+  );
+
+  if (!plainLand.length || averagePerTile <= 0 || maxPerTile <= 0) return;
 
   const totalBuildings = Math.min(
-    land.length * maxPerTile,
-    Math.round(land.length * averagePerTile),
+    plainLand.length * maxPerTile,
+    Math.round(plainLand.length * averagePerTile),
   );
 
   const slots = [];
-  for (const cell of land) {
+  for (const cell of plainLand) {
     for (let slot = 0; slot < maxPerTile; slot++) {
       // Later slots get a small penalty so the generator fills many tiles first,
       // but still allows multiple buildings when maxPerTile > 1.

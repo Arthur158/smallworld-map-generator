@@ -64,6 +64,7 @@ export const DEFAULT_SETTINGS = {
     averagePerTile: 0.35,
     maxPerTile: 1,
     sizeMultiplier: 1,
+    symbolBuildingChance: 100,
   },
 
   featureSettings: {
@@ -357,6 +358,13 @@ export function normalizeSettings(input = {}) {
         0.2,
         3,
       ),
+
+      symbolBuildingChance: clampNumber(
+        merged.buildingSettings?.symbolBuildingChance,
+        DEFAULT_SETTINGS.buildingSettings.symbolBuildingChance,
+        0,
+        100,
+      ),
     },
 
     featureSettings: {
@@ -504,14 +512,53 @@ async function loadGroupedImages(baseDir) {
   return grouped;
 }
 
+const FEATURE_BUILDING_FOLDERS = new Set(["magic", "mine", "cave"]);
+
+function getBuildingInfo(baseDir, file) {
+  const relativeParts = path.relative(baseDir, file).split(path.sep);
+
+  // Expected:
+  // src/assets/buildings/<biome>/<image>.png
+  // src/assets/buildings/<biome>/<feature>/<image>.png
+  // Example: src/assets/buildings/grass/magic/tower.png
+  if (relativeParts.length < 2) {
+    return null;
+  }
+
+  const biome = relativeParts[0];
+  const maybeFeature = relativeParts[1];
+
+  return {
+    biome,
+    feature: FEATURE_BUILDING_FOLDERS.has(maybeFeature) ? maybeFeature : null,
+  };
+}
+
+function createBuildingTextureGroup() {
+  return {
+    default: [],
+    magic: [],
+    mine: [],
+    cave: [],
+  };
+}
+
+function ensureBuildingTextureGroup(grouped, biome) {
+  if (!grouped[biome]) {
+    grouped[biome] = createBuildingTextureGroup();
+  }
+
+  return grouped[biome];
+}
+
 async function loadGroupedImageAssets(baseDir) {
   const grouped = {};
   const files = await collectImageFiles(baseDir);
 
   for (const file of files) {
-    const group = getAssetGroup(baseDir, file);
+    const info = getBuildingInfo(baseDir, file);
 
-    if (!group) {
+    if (!info) {
       console.warn(
         `[render-engine] Skipping building with no biome folder: ${path.relative(
           ROOT,
@@ -521,16 +568,15 @@ async function loadGroupedImageAssets(baseDir) {
       continue;
     }
 
-    if (!grouped[group]) {
-      grouped[group] = [];
-    }
+    const group = ensureBuildingTextureGroup(grouped, info.biome);
+    const bucket = info.feature ?? "default";
 
-    // IMPORTANT:
     // Building textures need filename metadata because the building renderer
     // uses the filename to decide custom render size.
-    grouped[group].push({
+    group[bucket].push({
       name: path.basename(file),
       image: await loadImage(file),
+      feature: info.feature,
     });
   }
 

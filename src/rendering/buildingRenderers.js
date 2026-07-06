@@ -68,27 +68,126 @@ function circleOverlapsRect(circle, rect) {
   return dx * dx + dy * dy < circle.radius * circle.radius;
 }
 
-function overlapsReservedLayout(position, size, layout) {
-  if (!layout?.featureIcon) return false;
-
-  const buildingRect = rectFromCenter(position, size, STACK_MARGIN);
-
-  const iconCircle = {
-    x: layout.featureIcon.x,
-    y: layout.featureIcon.y,
-    radius: layout.featureIcon.size / 2 + STACK_MARGIN,
-  };
-
-  return circleOverlapsRect(iconCircle, buildingRect);
+function getLayoutFeatureIcons(layout) {
+  if (Array.isArray(layout?.featureIcons)) return layout.featureIcons;
+  if (layout?.featureIcon) return [layout.featureIcon];
+  return [];
 }
 
-function makeCandidatePositions(centroid, size, index, total, seed, cellId) {
+function getPrimaryFeatureIcon(layout, building) {
+  const icons = getLayoutFeatureIcons(layout);
+  if (!icons.length) return null;
+
+  // If later you have multi-symbol layout icons with a feature/type field,
+  // this keeps the symbol building paired with the right icon.
+  if (building?.feature) {
+    const matchingIcon = icons.find(
+      (icon) => icon.feature === building.feature || icon.type === building.feature,
+    );
+
+    if (matchingIcon) return matchingIcon;
+  }
+
+  return icons[0];
+}
+
+function overlapsReservedLayout(position, size, layout, building) {
+  const featureIcons = getLayoutFeatureIcons(layout);
+  if (!featureIcons.length) return false;
+
+  const margin = building?.required ? STACK_MARGIN + 8 : STACK_MARGIN;
+  const buildingRect = rectFromCenter(position, size, margin);
+
+  return featureIcons.some((featureIcon) => {
+    const iconCircle = {
+      x: featureIcon.x,
+      y: featureIcon.y,
+      radius: featureIcon.size / 2 + margin,
+    };
+
+    return circleOverlapsRect(iconCircle, buildingRect);
+  });
+}
+
+function getBuildingAssetsForCell(buildingTextures, biome, feature = null) {
+  const biomeTextures = buildingTextures[biome];
+
+  // Backward compatibility with the old format:
+  // buildingTextures[biome] = [asset, asset, ...]
+  if (Array.isArray(biomeTextures)) {
+    return biomeTextures;
+  }
+
+  if (!biomeTextures || typeof biomeTextures !== "object") {
+    return [];
+  }
+
+  // Symbol buildings first try:
+  // src/assets/buildings/<biome>/<feature>/
+  if (feature && Array.isArray(biomeTextures[feature]) && biomeTextures[feature].length) {
+    return biomeTextures[feature];
+  }
+
+  // Fallback to normal biome folder:
+  // src/assets/buildings/<biome>/
+  return biomeTextures.default ?? [];
+}
+
+function makeCandidatePositions(
+  centroid,
+  size,
+  index,
+  total,
+  seed,
+  cellId,
+  building,
+  layout,
+) {
   const candidates = [];
   const phase =
-    hash01(seed, "building-phase", cellId, index, total) * Math.PI * 2;
+    hash01(seed, "building-phase", cellId, index, total, building?.feature ?? "plain") *
+    Math.PI * 2;
 
-  // Placement offsets from tile center. Intentionally not based strongly on
-  // rendered image size, otherwise large buildings get rejected everywhere.
+  // Required symbol buildings are placed around the symbol, not directly under it.
+  // This keeps both the icon and the required building visible while still being
+  // deterministic and semi-random per tile/seed.
+  if (building?.required) {
+    const featureIcon = getPrimaryFeatureIcon(layout, building);
+    const anchor = featureIcon ?? centroid;
+
+    const requiredRings = [42, 55, 68, 82];
+    const preferredAngles = [
+      Math.PI / 2,      // below the symbol first; usually most readable
+      Math.PI * 0.18,
+      Math.PI * 0.82,
+      -Math.PI * 0.18,
+      -Math.PI * 0.82,
+      0,
+      Math.PI,
+    ];
+
+    for (let ringIndex = 0; ringIndex < requiredRings.length; ringIndex++) {
+      const radius = requiredRings[ringIndex];
+
+      for (let i = 0; i < preferredAngles.length; i++) {
+        const angle =
+          preferredAngles[i] +
+          phase * 0.28 +
+          (hash01(seed, "required-building-angle", cellId, index, ringIndex, i) - 0.5) *
+            0.32;
+
+        const jitter =
+          0.9 +
+          hash01(seed, "required-building-radius", cellId, index, ringIndex, i) * 0.22;
+
+        candidates.push({
+          x: anchor.x + Math.cos(angle) * radius * jitter,
+          y: anchor.y + Math.sin(angle) * radius * 0.78 * jitter,
+        });
+      }
+    }
+  }
+
   const rings = [30, 44, 58, 74];
 
   for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
@@ -132,8 +231,6 @@ function findBuildingPlacement(
   const renderSize =
     getBuildingRenderSize(filename, building.scale ?? 1) * sizeMultiplier;
 
-  // Used only to decide whether the building position is valid. Keep small so
-  // artwork can intentionally overlap borders and scenery.
   const placementSizes = [
     BUILDING_PLACEMENT_SIZE,
     BUILDING_PLACEMENT_SIZE * 0.85,
@@ -141,7 +238,9 @@ function findBuildingPlacement(
   ];
 
   for (const placementSize of placementSizes) {
-    const minDistanceFromCenter = Math.min(28, placementSize * 0.55);
+    const minDistanceFromCenter = building.required
+      ? 0
+      : Math.min(28, placementSize * 0.55);
 
     const candidates = makeCandidatePositions(
       centroid,
@@ -150,6 +249,8 @@ function findBuildingPlacement(
       total,
       seed,
       cellId,
+      building,
+      layout,
     );
 
     for (const candidate of candidates) {
@@ -160,13 +261,35 @@ function findBuildingPlacement(
 
       if (distanceFromCenter < minDistanceFromCenter) continue;
       if (!rectInsidePolygon(candidate, placementSize, poly)) continue;
-      if (overlapsReservedLayout(candidate, placementSize, layout)) continue;
+      if (overlapsReservedLayout(candidate, placementSize, layout, building)) continue;
 
       return {
         position: candidate,
         size: renderSize,
       };
     }
+  }
+
+  // Last-resort fallback for required symbol buildings. The art may overlap a
+  // border, but it is still offset away from the symbol so both remain visible.
+  if (building.required) {
+    const featureIcon = getPrimaryFeatureIcon(layout, building);
+    const phase =
+      hash01(seed, "required-building-fallback-phase", cellId, index, building.feature ?? "plain") *
+      Math.PI *
+      2;
+
+    const anchor = featureIcon ?? centroid;
+    const radius = featureIcon ? 62 : 34;
+    const angle = Math.PI / 2 + (phase - Math.PI) * 0.22;
+
+    return {
+      position: {
+        x: anchor.x + Math.cos(angle) * radius,
+        y: anchor.y + Math.sin(angle) * radius * 0.78,
+      },
+      size: renderSize,
+    };
   }
 
   return null;
@@ -182,15 +305,34 @@ export function getBuildingDrawItems(
 ) {
   if (!cell.buildings?.length) return [];
 
-  const images = buildingTextures[cell.biome] ?? [];
-  if (!images.length) return [];
-
   const centroid = polygonCentroid(poly);
   const items = [];
 
   cell.buildings.forEach((building, index) => {
+    const images = getBuildingAssetsForCell(
+      buildingTextures,
+      cell.biome,
+      building.feature,
+    );
+
+    if (!images.length) {
+      console.warn(
+        `[buildings] No building image found for ${cell.biome}${
+          building.feature ? `/${building.feature}` : ""
+        }`,
+      );
+      return;
+    }
+
     const imageIndex = Math.floor(
-      hash01(seed, "building-image", cell.id, index, cell.biome) * images.length,
+      hash01(
+        seed,
+        "building-image",
+        cell.id,
+        index,
+        cell.biome,
+        building.feature ?? "plain",
+      ) * images.length,
     );
 
     const asset = images[Math.min(imageIndex, images.length - 1)];

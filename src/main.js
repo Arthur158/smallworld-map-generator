@@ -61,6 +61,7 @@ export const DEFAULT_SETTINGS = {
     averagePerTile: 0.35,
     maxPerTile: 1,
     sizeMultiplier: 1,
+    symbolBuildingChance: 100,
   },
   featureSettings: {
     magic: { count: 5, spread: 55 },
@@ -226,6 +227,12 @@ function normalizeSettings(input = {}) {
         0.2,
         3,
       ),
+      symbolBuildingChance: clampNumber(
+        merged.buildingSettings?.symbolBuildingChance,
+        DEFAULT_SETTINGS.buildingSettings.symbolBuildingChance,
+        0,
+        100,
+      ),
     },
     featureSettings: {
       magic: {
@@ -302,6 +309,7 @@ function readSettingsFromDom() {
       averagePerTile: document.getElementById("buildingAveragePerTile")?.value,
       maxPerTile: document.getElementById("maxBuildingsPerTile")?.value,
       sizeMultiplier: document.getElementById("buildingSizeMultiplier")?.value,
+      symbolBuildingChance: document.getElementById("symbolBuildingChance")?.value,
     },
     featureSettings: {
       magic: {
@@ -371,6 +379,7 @@ function syncDomFromSettings(settings) {
   setValue("buildingAveragePerTile", settings.buildingSettings.averagePerTile);
   setValue("maxBuildingsPerTile", settings.buildingSettings.maxPerTile);
   setValue("buildingSizeMultiplier", settings.buildingSettings.sizeMultiplier);
+  setValue("symbolBuildingChance", settings.buildingSettings.symbolBuildingChance);
 
   setValue("magicCount", settings.featureSettings.magic.count);
   setValue("magicSpread", settings.featureSettings.magic.spread);
