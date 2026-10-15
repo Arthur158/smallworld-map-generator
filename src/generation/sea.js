@@ -165,6 +165,10 @@ export function makeReservedWaterSites(config, width, height) {
     perCorner = 1;
   }
 
+  // Opt-in board games count final regions, so each requested sea has one
+  // reserved site. The default retains its existing multi-cell coastlines.
+  if (config.preserveRegionCount === true) perCorner = 1;
+
   for (const corner of waterPlan.activeCorners) {
     const profile = waterPlan.cornerProfiles[corner];
 
@@ -264,6 +268,10 @@ export function markSeaCells(cells, config, rng, width, height) {
       cell.waterKind = "lake";
       continue;
     }
+
+    // In fixed-count mode water is assigned only to its reserved sites.
+    // Reclassifying a land centroid would change the requested sea supply.
+    if (config.preserveRegionCount === true) continue;
 
     if (waterPlan.centerLake && waterPlan.lakeProfile) {
       const dx = centroid.x - waterPlan.lakeProfile.x;

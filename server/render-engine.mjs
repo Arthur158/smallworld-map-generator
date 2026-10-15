@@ -160,6 +160,8 @@ export function normalizeSettings(input = {}) {
 
   return {
     seed: String(merged.seed || DEFAULT_SETTINGS.seed),
+    // Optional: existing UI and training callers keep their original maps.
+    preserveRegionCount: merged.preserveRegionCount === true,
 
     tileCount: Math.round(
       clampNumber(

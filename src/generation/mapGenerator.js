@@ -41,7 +41,16 @@ export function makeMap(config) {
   // Merge touching sea cells before features/buildings/rendering/export so the
   // water region behaves like one real tile while preserving the nice combined
   // multi-cell coastline shape from the generator.
-  const mergedCells = mergeAdjacentWaterCells(cells);
+  // The opt-in fixed-count path has one site per requested water region and
+  // deliberately keeps adjacent corner seas distinct. Legacy callers keep
+  // their original classification, merging, and random-number sequence.
+  const mergedCells = config.preserveRegionCount === true
+    ? cells
+    : mergeAdjacentWaterCells(cells);
+
+  if (config.preserveRegionCount === true && mergedCells.length !== config.tileCount) {
+    throw new Error(`Could not place all ${config.tileCount} requested regions`);
+  }
 
   assignFeaturesAndObjects(mergedCells, generationConfig, rng);
 
