@@ -2,412 +2,223 @@ import { hash01 } from "../rng.js";
 import { polygonCentroid } from "../geometry/polygon.js";
 import { getBuildingRenderSize } from "./buildingSizeRegistry.js";
 
-const BORDER_MARGIN = 5;
-const STACK_MARGIN = 6;
-const BUILDING_PLACEMENT_SIZE = 24;
+const BORDER_MARGIN = 7;
+const STACK_MARGIN = 8;
+const ICON_MARGIN = 5;
+const MIN_BUILDING_SIZE = 20;
 
 function pointInPolygon(point, polygon) {
   let inside = false;
-
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x;
-    const yi = polygon[i].y;
-    const xj = polygon[j].x;
-    const yj = polygon[j].y;
-
-    const intersects =
-      yi > point.y !== yj > point.y &&
-      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
-
-    if (intersects) inside = !inside;
+    const a = polygon[i], b = polygon[j];
+    if ((a.y > point.y) !== (b.y > point.y) &&
+        point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
   }
-
   return inside;
 }
 
-function rectFromCenter(position, size, margin = 0) {
-  const finalSize = size + margin * 2;
-
-  return {
-    x: position.x - finalSize / 2,
-    y: position.y - finalSize / 2,
-    width: finalSize,
-    height: finalSize,
-  };
+function expandRect(rect, margin) {
+  return { x: rect.x - margin, y: rect.y - margin,
+    width: rect.width + margin * 2, height: rect.height + margin * 2 };
 }
 
-function rectSamplePoints(rect) {
-  const { x, y, width, height } = rect;
-
+function rectCorners(rect) {
   return [
-    { x, y },
-    { x: x + width, y },
-    { x, y: y + height },
-    { x: x + width, y: y + height },
-    { x: x + width / 2, y },
-    { x: x + width / 2, y: y + height },
-    { x, y: y + height / 2 },
-    { x: x + width, y: y + height / 2 },
-    { x: x + width / 2, y: y + height / 2 },
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y },
+    { x: rect.x + rect.width, y: rect.y + rect.height },
+    { x: rect.x, y: rect.y + rect.height },
   ];
 }
 
-function rectInsidePolygon(position, size, polygon) {
-  const rect = rectFromCenter(position, size, BORDER_MARGIN);
+function cross(a, b, p) {
+  return (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+}
 
-  return rectSamplePoints(rect).every((point) => pointInPolygon(point, polygon));
+function segmentsCross(a, b, c, d) {
+  return cross(a, b, c) * cross(a, b, d) < 0 &&
+    cross(c, d, a) * cross(c, d, b) < 0;
+}
+
+function rectInsidePolygon(bounds, polygon) {
+  const corners = rectCorners(expandRect(bounds, BORDER_MARGIN));
+  if (!corners.every(point => pointInPolygon(point, polygon))) return false;
+  // Curved borders are sampled polygons and can be concave. Checking just
+  // corners would allow a narrow inlet to cross the artwork between them.
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length];
+    for (let j = 0; j < corners.length; j++) {
+      if (segmentsCross(a, b, corners[j], corners[(j + 1) % corners.length])) return false;
+    }
+  }
+  return true;
+}
+
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.width && a.x + a.width > b.x &&
+    a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 function circleOverlapsRect(circle, rect) {
-  const closestX = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
-  const closestY = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
-
-  const dx = circle.x - closestX;
-  const dy = circle.y - closestY;
-
-  return dx * dx + dy * dy < circle.radius * circle.radius;
+  const x = Math.max(rect.x, Math.min(circle.x, rect.x + rect.width));
+  const y = Math.max(rect.y, Math.min(circle.y, rect.y + rect.height));
+  return (circle.x - x) ** 2 + (circle.y - y) ** 2 < circle.radius ** 2;
 }
 
-function getLayoutFeatureIcons(layout) {
+function featureIcons(layout) {
   if (Array.isArray(layout?.featureIcons)) return layout.featureIcons;
-  if (layout?.featureIcon) return [layout.featureIcon];
-  return [];
+  return layout?.featureIcon ? [layout.featureIcon] : [];
 }
 
-function getPrimaryFeatureIcon(layout, building) {
-  const icons = getLayoutFeatureIcons(layout);
-  if (!icons.length) return null;
-
-  // If later you have multi-symbol layout icons with a feature/type field,
-  // this keeps the symbol building paired with the right icon.
-  if (building?.feature) {
-    const matchingIcon = icons.find(
-      (icon) => icon.feature === building.feature || icon.type === building.feature,
-    );
-
-    if (matchingIcon) return matchingIcon;
-  }
-
-  return icons[0];
+function overlapsReservedLayout(bounds, layout, occupied) {
+  const stack = layout?.stack;
+  const stackRect = stack?.rect ?? (stack ? {
+    x: stack.x, y: stack.y - stack.size, width: stack.size, height: stack.size,
+  } : null);
+  if (stackRect && rectsOverlap(bounds, expandRect(stackRect, STACK_MARGIN))) return true;
+  if (featureIcons(layout).some(icon => circleOverlapsRect({
+    x: icon.x, y: icon.y, radius: icon.size / 2 + ICON_MARGIN,
+  }, bounds))) return true;
+  return occupied.some(rect => rectsOverlap(bounds, expandRect(rect, 6)));
 }
 
-function overlapsReservedLayout(position, size, layout, building) {
-  const featureIcons = getLayoutFeatureIcons(layout);
-  if (!featureIcons.length) return false;
-
-  const margin = building?.required ? STACK_MARGIN + 8 : STACK_MARGIN;
-  const buildingRect = rectFromCenter(position, size, margin);
-
-  return featureIcons.some((featureIcon) => {
-    const iconCircle = {
-      x: featureIcon.x,
-      y: featureIcon.y,
-      radius: featureIcon.size / 2 + margin,
-    };
-
-    return circleOverlapsRect(iconCircle, buildingRect);
-  });
+function getBuildingAssetsForCell(textures, biome, feature) {
+  const group = textures[biome];
+  if (Array.isArray(group)) return group;
+  if (!group || typeof group !== "object") return [];
+  if (feature && group[feature]?.length) return group[feature];
+  return group.default ?? [];
 }
 
-function getBuildingAssetsForCell(buildingTextures, biome, feature = null) {
-  const biomeTextures = buildingTextures[biome];
-
-  // Backward compatibility with the old format:
-  // buildingTextures[biome] = [asset, asset, ...]
-  if (Array.isArray(biomeTextures)) {
-    return biomeTextures;
+function polygonMetrics(poly) {
+  let area = 0, minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    area += p.x * q.y - q.x * p.y;
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
   }
-
-  if (!biomeTextures || typeof biomeTextures !== "object") {
-    return [];
-  }
-
-  // Symbol buildings first try:
-  // src/assets/buildings/<biome>/<feature>/
-  if (feature && Array.isArray(biomeTextures[feature]) && biomeTextures[feature].length) {
-    return biomeTextures[feature];
-  }
-
-  // Fallback to normal biome folder:
-  // src/assets/buildings/<biome>/
-  return biomeTextures.default ?? [];
+  return { area: Math.abs(area) / 2, x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
-function makeCandidatePositions(
-  centroid,
-  size,
-  index,
-  total,
-  seed,
-  cellId,
-  building,
-  layout,
-) {
-  const candidates = [];
-  const phase =
-    hash01(seed, "building-phase", cellId, index, total, building?.feature ?? "plain") *
-    Math.PI * 2;
+function sourceRectForAsset(asset, image) {
+  const source = asset?.sourceRect;
+  if (source && source.width > 0 && source.height > 0) return { ...source };
+  return { x: 0, y: 0, width: image.naturalWidth || image.width || 1,
+    height: image.naturalHeight || image.height || 1 };
+}
 
-  // Required symbol buildings are placed around the symbol, not directly under it.
-  // This keeps both the icon and the required building visible while still being
-  // deterministic and semi-random per tile/seed.
-  if (building?.required) {
-    const featureIcon = getPrimaryFeatureIcon(layout, building);
-    const anchor = featureIcon ?? centroid;
-
-    const requiredRings = [42, 55, 68, 82];
-    const preferredAngles = [
-      Math.PI / 2,      // below the symbol first; usually most readable
-      Math.PI * 0.18,
-      Math.PI * 0.82,
-      -Math.PI * 0.18,
-      -Math.PI * 0.82,
-      0,
-      Math.PI,
-    ];
-
-    for (let ringIndex = 0; ringIndex < requiredRings.length; ringIndex++) {
-      const radius = requiredRings[ringIndex];
-
-      for (let i = 0; i < preferredAngles.length; i++) {
-        const angle =
-          preferredAngles[i] +
-          phase * 0.28 +
-          (hash01(seed, "required-building-angle", cellId, index, ringIndex, i) - 0.5) *
-            0.32;
-
-        const jitter =
-          0.9 +
-          hash01(seed, "required-building-radius", cellId, index, ringIndex, i) * 0.22;
-
-        candidates.push({
-          x: anchor.x + Math.cos(angle) * radius * jitter,
-          y: anchor.y + Math.sin(angle) * radius * 0.78 * jitter,
-        });
+function candidatePositions(poly, metrics, layout, building, seed, cellId, index) {
+  const center = polygonCentroid(poly);
+  const phase = hash01(seed, "building-placement", cellId, index) * Math.PI * 2;
+  const icon = featureIcons(layout).find(item =>
+    item.feature === building.feature || item.type === building.feature,
+  ) ?? featureIcons(layout)[0];
+  const anchors = building.required && icon ? [icon, center] : [center];
+  const positions = [];
+  for (const anchor of anchors) {
+    for (const fraction of [0.22, 0.34, 0.46, 0.58]) {
+      for (let i = 0; i < 12; i++) {
+        const angle = phase + i * Math.PI / 6;
+        positions.push({ x: anchor.x + Math.cos(angle) * metrics.width * fraction,
+          y: anchor.y + Math.sin(angle) * metrics.height * fraction });
       }
     }
   }
-
-  const rings = [30, 44, 58, 74];
-
-  for (let ringIndex = 0; ringIndex < rings.length; ringIndex++) {
-    const radius = rings[ringIndex];
-    const steps = 10 + ringIndex * 4;
-
-    for (let i = 0; i < steps; i++) {
-      const angle = phase + (Math.PI * 2 * i) / steps;
-
-      const jitter =
-        0.85 +
-        hash01(seed, "building-jitter", cellId, index, ringIndex, i) * 0.3;
-
-      candidates.push({
-        x: centroid.x + Math.cos(angle) * radius * jitter,
-        y: centroid.y + Math.sin(angle) * radius * 0.72 * jitter,
-      });
+  // A bounded interior grid also finds useful space in long or concave regions.
+  for (let row = 1; row < 7; row++) {
+    for (let col = 1; col < 7; col++) {
+      positions.push({ x: metrics.x + metrics.width * col / 7,
+        y: metrics.y + metrics.height * row / 7 });
     }
   }
-
-  return candidates;
+  return positions;
 }
 
-function findBuildingPlacement(
-  poly,
-  centroid,
-  building,
-  filename,
-  index,
-  total,
-  seed,
-  cellId,
-  layout,
-  buildingSettings = {},
-) {
-  const rawSizeMultiplier = Number(buildingSettings?.sizeMultiplier ?? 1);
-  const sizeMultiplier = Number.isFinite(rawSizeMultiplier)
-    ? Math.max(0.2, Math.min(3, rawSizeMultiplier))
-    : 1;
-
-  const renderSize =
-    getBuildingRenderSize(filename, building.scale ?? 1) * sizeMultiplier;
-
-  const placementSizes = [
-    BUILDING_PLACEMENT_SIZE,
-    BUILDING_PLACEMENT_SIZE * 0.85,
-    BUILDING_PLACEMENT_SIZE * 0.7,
-  ];
-
-  for (const placementSize of placementSizes) {
-    const minDistanceFromCenter = building.required
-      ? 0
-      : Math.min(28, placementSize * 0.55);
-
-    const candidates = makeCandidatePositions(
-      centroid,
-      placementSize,
-      index,
-      total,
-      seed,
-      cellId,
-      building,
-      layout,
-    );
-
-    for (const candidate of candidates) {
-      const distanceFromCenter = Math.hypot(
-        candidate.x - centroid.x,
-        candidate.y - centroid.y,
-      );
-
-      if (distanceFromCenter < minDistanceFromCenter) continue;
-      if (!rectInsidePolygon(candidate, placementSize, poly)) continue;
-      if (overlapsReservedLayout(candidate, placementSize, layout, building)) continue;
-
-      return {
-        position: candidate,
-        size: renderSize,
-      };
+function findBuildingPlacement(poly, asset, sourceRect, building, seed, cellId, index, layout, settings, occupied) {
+  const metrics = polygonMetrics(poly);
+  if (metrics.area <= 0 || metrics.width <= 0 || metrics.height <= 0) return null;
+  const multiplier = Number(settings?.sizeMultiplier ?? 1);
+  const safeMultiplier = Number.isFinite(multiplier) ? Math.max(0.2, Math.min(3, multiplier)) : 1;
+  const requested = getBuildingRenderSize(asset?.name, building.scale ?? 1, asset?.renderSize) * safeMultiplier;
+  // Art stays subordinate to the region and its 72px game-piece stack, even
+  // with legacy 2–3x size settings or an unusually large source illustration.
+  const longestSide = Math.min(requested, 84, Math.sqrt(metrics.area) * 0.36,
+    Math.min(metrics.width, metrics.height) * 0.55);
+  const ratio = sourceRect.width / sourceRect.height;
+  const positions = candidatePositions(poly, metrics, layout, building, seed, cellId, index);
+  for (const factor of [1, 0.88, 0.76, 0.64, 0.52]) {
+    const size = longestSide * factor;
+    if (size < MIN_BUILDING_SIZE) continue;
+    const width = ratio >= 1 ? size : size * ratio;
+    const height = ratio >= 1 ? size / ratio : size;
+    for (const position of positions) {
+      const bounds = { x: position.x - width / 2, y: position.y - height / 2, width, height };
+      if (!rectInsidePolygon(bounds, poly) || overlapsReservedLayout(bounds, layout, occupied)) continue;
+      return { position, bounds, width, height, size };
     }
   }
-
-  // Last-resort fallback for required symbol buildings. The art may overlap a
-  // border, but it is still offset away from the symbol so both remain visible.
-  if (building.required) {
-    const featureIcon = getPrimaryFeatureIcon(layout, building);
-    const phase =
-      hash01(seed, "required-building-fallback-phase", cellId, index, building.feature ?? "plain") *
-      Math.PI *
-      2;
-
-    const anchor = featureIcon ?? centroid;
-    const radius = featureIcon ? 62 : 34;
-    const angle = Math.PI / 2 + (phase - Math.PI) * 0.22;
-
-    return {
-      position: {
-        x: anchor.x + Math.cos(angle) * radius,
-        y: anchor.y + Math.sin(angle) * radius * 0.78,
-      },
-      size: renderSize,
-    };
-  }
-
+  // Buildings are decoration: omitting one is better than covering borders,
+  // stacks or feature symbols when a narrow region has no suitable space.
   return null;
 }
 
-export function getBuildingDrawItems(
-  cell,
-  poly,
-  seed,
-  buildingTextures = {},
-  layout = null,
-  buildingSettings = {},
-) {
-  if (!cell.buildings?.length) return [];
-
-  const centroid = polygonCentroid(poly);
+export function getBuildingDrawItems(cell, poly, seed, buildingTextures = {}, layout = null, buildingSettings = {}) {
+  if (!cell.buildings?.length || poly.length < 3) return [];
   const items = [];
-
   cell.buildings.forEach((building, index) => {
-    const images = getBuildingAssetsForCell(
-      buildingTextures,
-      cell.biome,
-      building.feature,
-    );
-
-    if (!images.length) {
-      console.warn(
-        `[buildings] No building image found for ${cell.biome}${
-          building.feature ? `/${building.feature}` : ""
-        }`,
-      );
-      return;
-    }
-
-    const imageIndex = Math.floor(
-      hash01(
-        seed,
-        "building-image",
-        cell.id,
-        index,
-        cell.biome,
-        building.feature ?? "plain",
-      ) * images.length,
-    );
-
-    const asset = images[Math.min(imageIndex, images.length - 1)];
+    const assets = [...getBuildingAssetsForCell(buildingTextures, cell.biome, building.feature)]
+      .sort((a, b) => String(a?.name ?? "").localeCompare(String(b?.name ?? "")));
+    if (!assets.length) return;
+    const imageIndex = Math.min(assets.length - 1, Math.floor(hash01(seed, "building-image",
+      cell.id, index, cell.biome, building.feature ?? "plain") * assets.length));
+    const asset = assets[imageIndex];
     const image = asset?.image ?? asset;
-    const filename = asset?.name;
-
     if (!image) return;
-
-    const placement = findBuildingPlacement(
-      poly,
-      centroid,
-      building,
-      filename,
-      index,
-      cell.buildings.length,
-      seed,
-      cell.id,
-      layout,
-      buildingSettings,
-    );
-
+    const sourceRect = sourceRectForAsset(asset, image);
+    const placement = findBuildingPlacement(poly, asset, sourceRect, building, seed,
+      cell.id, index, layout, buildingSettings, items.map(item => item.bounds));
     if (!placement) return;
-
-    const { position, size } = placement;
-
-    items.push({
-      kind: "building",
-      cellId: cell.id,
-      image,
-      x: position.x,
-      y: position.y,
-      size,
-      // Sort by visual baseline. This lets buildings sit in front of trees
-      // behind them, but behind trees/mountains lower in the tile.
-      z: position.y + size * 0.28,
-    });
+    const { position, bounds, width, height, size } = placement;
+    const ground = { x: position.x, y: bounds.y + height * 0.92,
+      rx: width * 0.32, ry: Math.min(5, height * 0.055) };
+    items.push({ kind: "building", cellId: cell.id, image, sourceRect,
+      x: position.x, y: position.y, width, height, size, bounds, ground,
+      biome: cell.biome, z: ground.y });
   });
-
   return items;
 }
 
 export function drawBuildingItem(ctx, item) {
   ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.32)";
-  ctx.shadowBlur = 6;
-  ctx.shadowOffsetY = 4;
-  ctx.drawImage(
-    item.image,
-    item.x - item.size / 2,
-    item.y - item.size / 2,
-    item.size,
-    item.size,
-  );
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  // A soft contact shadow sits under the base, rather than making the whole
+  // illustration float above the terrain with a dark sticker-like outline.
+  ctx.save();
+  ctx.translate(item.ground.x, item.ground.y);
+  ctx.scale(item.ground.rx, item.ground.ry);
+  const contact = ctx.createRadialGradient(0, 0, 0.15, 0, 0, 1);
+  contact.addColorStop(0, "rgba(51, 43, 28, 0.17)");
+  contact.addColorStop(0.55, "rgba(51, 43, 28, 0.08)");
+  contact.addColorStop(1, "rgba(51, 43, 28, 0)");
+  ctx.fillStyle = contact;
+  ctx.beginPath();
+  ctx.arc(0, 0, 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  const source = item.sourceRect;
+  ctx.drawImage(item.image, source.x, source.y, source.width, source.height,
+    item.bounds.x, item.bounds.y, item.width, item.height);
   ctx.restore();
 }
 
-export function drawBuildings(
-  ctx,
-  cell,
-  poly,
-  seed,
-  buildingTextures = {},
-  layout = null,
-  buildingSettings = {},
-) {
-  const items = getBuildingDrawItems(
-    cell,
-    poly,
-    seed,
-    buildingTextures,
-    layout,
-    buildingSettings,
-  );
-
-  for (const item of items) {
+export function drawBuildings(ctx, cell, poly, seed, buildingTextures = {}, layout = null, buildingSettings = {}) {
+  for (const item of getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings)) {
     drawBuildingItem(ctx, item);
   }
 }

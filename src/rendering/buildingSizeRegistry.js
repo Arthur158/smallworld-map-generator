@@ -29,6 +29,11 @@ export const BUILDING_SIZE_BY_FILENAME = {
   "mine4.png": 30,
 };
 
-export function getBuildingRenderSize(filename, scale = 1) {
-  return (BUILDING_SIZE_BY_FILENAME[filename] ?? DEFAULT_BUILDING_SIZE) * scale;
+export function getBuildingRenderSize(filename, scale = 1, renderSize) {
+  const requested = Number(renderSize);
+  const base = Number.isFinite(requested) && requested > 0
+    ? requested
+    : BUILDING_SIZE_BY_FILENAME[filename] ?? DEFAULT_BUILDING_SIZE;
+  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return base * safeScale;
 }

@@ -1,3 +1,16 @@
+import { BUILDING_ATLASES, addBuildingAsset, prepareBuildingAsset, prepareBuildingAtlas, useLegacyBuilding } from "./buildingAtlasCatalog.js";
+
+const atlasModules = import.meta.glob("../assets/building-atlases/*.png", {
+  eager: true, query: "?url", import: "default",
+});
+
+function createCanvas(width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
 const buildingModules = import.meta.glob(
   "../assets/buildings/**/*.{png,jpg,jpeg,webp,avif}",
   {
@@ -35,28 +48,11 @@ function getBuildingInfoFromPath(path) {
   };
 }
 
-function createBuildingTextureGroup() {
-  return {
-    default: [],
-    magic: [],
-    mine: [],
-    cave: [],
-  };
-}
-
-function ensureBuildingTextureGroup(textures, biome) {
-  if (!textures[biome]) {
-    textures[biome] = createBuildingTextureGroup();
-  }
-
-  return textures[biome];
-}
-
 export async function loadBuildingTextures() {
   const entries = await Promise.all(
     Object.entries(buildingModules).map(async ([path, src]) => {
       const info = getBuildingInfoFromPath(path);
-      if (!info) return null;
+      if (!info || !useLegacyBuilding(path.split("/").pop(), info.feature)) return null;
 
       return {
         ...info,
@@ -72,14 +68,17 @@ export async function loadBuildingTextures() {
   for (const entry of entries) {
     if (!entry) continue;
 
-    const group = ensureBuildingTextureGroup(textures, entry.biome);
-    const bucket = entry.feature ?? "default";
-
-    group[bucket].push({
+    addBuildingAsset(textures, entry.biome, prepareBuildingAsset(entry.image, {
       name: entry.name,
-      image: entry.image,
       feature: entry.feature,
-    });
+    }, createCanvas));
+  }
+
+  for (const atlas of BUILDING_ATLASES) {
+    const image = await loadImage(atlasModules[`../assets/building-atlases/${atlas.file}`]);
+    for (const asset of prepareBuildingAtlas(image, atlas, createCanvas)) {
+      addBuildingAsset(textures, atlas.biome, asset);
+    }
   }
 
   return textures;

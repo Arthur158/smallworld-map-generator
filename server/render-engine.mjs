@@ -5,6 +5,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 import { makeMap } from "../src/generation/mapGenerator.js";
 import { renderMapNode } from "./render-map-node.mjs";
+import { BUILDING_ATLASES, addBuildingAsset, prepareBuildingAsset, prepareBuildingAtlas, useLegacyBuilding } from "../src/rendering/buildingAtlasCatalog.js";
 import {
   createMapMetadata,
   generateGoMapFunction,
@@ -536,23 +537,6 @@ function getBuildingInfo(baseDir, file) {
   };
 }
 
-function createBuildingTextureGroup() {
-  return {
-    default: [],
-    magic: [],
-    mine: [],
-    cave: [],
-  };
-}
-
-function ensureBuildingTextureGroup(grouped, biome) {
-  if (!grouped[biome]) {
-    grouped[biome] = createBuildingTextureGroup();
-  }
-
-  return grouped[biome];
-}
-
 async function loadGroupedImageAssets(baseDir) {
   const grouped = {};
   const files = await collectImageFiles(baseDir);
@@ -570,16 +554,18 @@ async function loadGroupedImageAssets(baseDir) {
       continue;
     }
 
-    const group = ensureBuildingTextureGroup(grouped, info.biome);
-    const bucket = info.feature ?? "default";
-
-    // Building textures need filename metadata because the building renderer
-    // uses the filename to decide custom render size.
-    group[bucket].push({
+    if (!useLegacyBuilding(path.basename(file), info.feature)) continue;
+    addBuildingAsset(grouped, info.biome, prepareBuildingAsset(await loadImage(file), {
       name: path.basename(file),
-      image: await loadImage(file),
       feature: info.feature,
-    });
+    }, createCanvas));
+  }
+
+  for (const atlas of BUILDING_ATLASES) {
+    const image = await loadImage(path.join(ASSETS_DIR, "building-atlases", atlas.file));
+    for (const asset of prepareBuildingAtlas(image, atlas, createCanvas)) {
+      addBuildingAsset(grouped, atlas.biome, asset);
+    }
   }
 
   return grouped;

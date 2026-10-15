@@ -5,6 +5,7 @@
   "description": "A browser-based procedural board-game map generator using Voronoi cells, balanced biomes, sea corners, wobbly borders, and tile features.",
   "type": "module",
   "scripts": {
+    "test:rendering": "node --test src/rendering/*.test.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",

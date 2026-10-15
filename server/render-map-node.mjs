@@ -9,6 +9,7 @@ import { drawBiomeBase } from "../src/rendering/biomeRenderers.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
+  protectBuildingClearings,
 } from "../src/rendering/tileObjectRenderers.js";
 
 function drawBackground(ctx, config) {
@@ -109,7 +110,7 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
     return String(a.cellId).localeCompare(String(b.cellId));
   });
 
-  return items;
+  return protectBuildingClearings(items);
 }
 
 export function renderMapNode(ctx, cells, config) {

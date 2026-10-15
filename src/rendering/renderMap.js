@@ -10,6 +10,7 @@ import { drawFeatureIcon } from "./icons.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
+  protectBuildingClearings,
 } from "./tileObjectRenderers.js";
 
 function drawBackground(ctx, config) {
@@ -99,7 +100,7 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
     return String(a.cellId).localeCompare(String(b.cellId));
   });
 
-  return items;
+  return protectBuildingClearings(items);
 }
 
 export function renderMap(ctx, cells, config) {

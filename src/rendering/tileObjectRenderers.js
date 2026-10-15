@@ -229,6 +229,37 @@ function makeMountainDrawItems(cell, poly, seed, sceneryTextures, scenerySetting
   });
 }
 
+function overlapArea(a, b) {
+  return Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x)) *
+    Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+}
+
+function obscuresBuilding(item, building) {
+  // Rear scenery remains in place and provides a natural backdrop. Only
+  // foreground objects that cover the facade are thinned into a small clearing.
+  if (item.z < building.z) return false;
+  const sceneryBounds = {
+    x: item.x - item.width / 2, y: item.y - item.height * 0.86,
+    width: item.width, height: item.height,
+  };
+  const core = {
+    x: building.bounds.x + building.width * 0.16,
+    y: building.bounds.y + building.height * 0.12,
+    width: building.width * 0.68, height: building.height * 0.8,
+  };
+  return overlapArea(sceneryBounds, core) >
+    Math.min(item.width * item.height, core.width * core.height) * 0.18;
+}
+
+// Apply after collecting all regions as well as within a region: trees and
+// mountains may overhang a neighboring region's otherwise clear building.
+export function protectBuildingClearings(items) {
+  const buildings = items.filter(item => item.kind === "building");
+  if (!buildings.length) return items;
+  return items.filter(item => item.kind === "building" ||
+    !buildings.some(building => obscuresBuilding(item, building)));
+}
+
 export function collectTileObjectDrawItems({
   cell,
   poly,
@@ -239,28 +270,15 @@ export function collectTileObjectDrawItems({
   buildingSettings = {},
   scenerySettings = {},
 }) {
-  const items = [];
-
+  const buildings = getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings);
+  const scenery = [];
   if (cell.biome === "forest") {
-    items.push(...makeForestDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));
+    scenery.push(...makeForestDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));
   }
-
   if (cell.biome === "mountain") {
-    items.push(...makeMountainDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));
+    scenery.push(...makeMountainDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));
   }
-
-  items.push(
-    ...getBuildingDrawItems(
-      cell,
-      poly,
-      seed,
-      buildingTextures,
-      layout,
-      buildingSettings,
-    ),
-  );
-
-  return items;
+  return protectBuildingClearings([...scenery, ...buildings]);
 }
 
 function drawFallbackPineTree(ctx, item) {
