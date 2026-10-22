@@ -33,6 +33,10 @@
       </label>
     </div>
 
+    <label class="border-visibility" title="Show the region outlines. Turn off for uninterrupted terrain and shorelines; regions and game rules stay the same. Generate to apply.">
+      <input id="showBorders" type="checkbox" checked /> Show region borders
+    </label>
+
     <h2>Tile shape</h2>
 
       <label>
@@ -51,7 +55,7 @@
 
     <label>
       Biome spread
-      <input id="spread" type="range" min="0" max="100" value="70" />
+      <input id="spread" type="range" min="0" max="100" value="0" />
     </label>
     <p class="hint">
       Low spread = scattered biomes. High spread = biomes gather into larger regions.
@@ -140,12 +144,16 @@
     </div>
 
 
-    <h2>Forest / mountain object layers</h2>
+    <h2>Scenery &amp; buildings</h2>
     <p class="hint">
       Forest tiles now start as hill tiles and draw tree sprites from
       <code>src/assets/forests/pine</code> or <code>src/assets/forests/normal</code>.
       Mountain tiles do the same with <code>src/assets/mountains</code>. Bigger objects automatically mean lower density.
     </p>
+
+    <label class="border-visibility" title="Place one large city on a field, when the map has one.">
+      <input id="showFieldCity" type="checkbox" checked /> Grand city
+    </label>
 
     <div class="feature-grid">
       <label>
@@ -156,6 +164,22 @@
       <label>
         Mountain object size %
         <input id="mountainObjectSize" type="range" min="35" max="240" step="5" value="100" />
+      </label>
+
+      <label title="0% turns clouds off; 100% is the sparse default. Generate to preview.">
+        Cloud amount %
+        <input id="cloudDensity" type="range" min="0" max="200" step="10" value="100" />
+      </label>
+
+      <label title="Tiny flying birds cross region borders. 0% turns them off; 100% is the sparse default. Generate to preview.">
+        Bird amount %
+        <input id="birdDensity" type="range" min="0" max="200" step="10" value="100" />
+      </label>
+
+      <label>
+        Rivers
+        <input id="riverCount" type="number" min="0" max="6" step="1" value="2"
+          title="Up to 2 short rivers, each crossing at most four land regions. Routes need a mountain or map-edge source and a water outlet. Zero turns rivers off." />
       </label>
     </div>
 
@@ -201,7 +225,7 @@
 
       <label>
         max per tile
-        <input id="maxBuildingsPerTile" type="number" min="0" max="5" value="1" />
+        <input id="maxBuildingsPerTile" type="number" min="0" max="5" value="2" />
       </label>
 
       <label>
@@ -260,6 +284,10 @@
   </aside>
 
   <main>
+    <header class="map-heading">
+      <span>Continent</span>
+      <h2 id="regionName" aria-live="polite">Generating map…</h2>
+    </header>
     <canvas id="map" width="1400" height="900"></canvas>
   </main>
 

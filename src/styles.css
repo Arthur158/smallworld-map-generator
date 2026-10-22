@@ -92,9 +92,24 @@ button.secondary {
   margin: 0;
 }
 
+.border-visibility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.border-visibility input {
+  width: auto;
+  margin: 0;
+  flex-shrink: 0;
+}
+
 main {
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 12px;
   overflow: hidden;
   background: radial-gradient(circle at center, #333 0%, #111 75%);
   height: 100vh;
@@ -106,12 +121,29 @@ canvas {
   height: auto;
 
   max-width: calc(100vw - 340px);
-  max-height: calc(100vh - 28px);
+  max-height: calc(100vh - 100px);
 
   background: #84c9ff;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.55);
   border: 10px solid #111;
   box-sizing: border-box;
+}
+
+.map-heading {
+  text-align: center;
+}
+
+.map-heading > span {
+  color: #aaa;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.map-heading > h2 {
+  margin: 2px 0 0;
+  font-size: 24px;
+  font-weight: 500;
 }
 
 .hint {

@@ -1,4 +1,7 @@
 import { BUILDING_ATLASES, addBuildingAsset, prepareBuildingAsset, prepareBuildingAtlas, useLegacyBuilding } from "./buildingAtlasCatalog.js";
+import landAnimalAtlasUrl from "../assets/wildlife/land-animals.png?url";
+import flockAtlasUrl from "../assets/wildlife/pasture-flocks.png?url";
+import { addLandAnimalAssets, prepareLandAnimalAtlas, prepareFlockAtlas } from "./wildlifeAtlasCatalog.js";
 
 const atlasModules = import.meta.glob("../assets/building-atlases/*.png", {
   eager: true, query: "?url", import: "default",
@@ -81,5 +84,7 @@ export async function loadBuildingTextures() {
     }
   }
 
+  addLandAnimalAssets(textures, prepareLandAnimalAtlas(await loadImage(landAnimalAtlasUrl), createCanvas));
+  addLandAnimalAssets(textures, prepareFlockAtlas(await loadImage(flockAtlasUrl), createCanvas));
   return textures;
 }

@@ -2,6 +2,7 @@ import {
   buildSharedCurvedGeometry,
   polygonCentroid,
 } from "../geometry/polygon.js";
+import { generateRegionName, REGION_NAME_VERSION } from "../generation/continentNames.js";
 
 export const STACK_SIZE = 72;
 export const FEATURE_ICON_SIZE = 44;
@@ -402,6 +403,8 @@ export function createMapMetadata(cells, config) {
   return {
     version: 1,
     seed: config.seed,
+    regionName: generateRegionName(config.seed),
+    regionNameVersion: REGION_NAME_VERSION,
     canvas: {
       width: config.width,
       height: config.height,

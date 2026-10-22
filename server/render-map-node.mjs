@@ -1,4 +1,5 @@
 import { hash01 } from "../src/rng.js";
+import { createCanvas } from "@napi-rs/canvas";
 import {
   buildSharedCurvedGeometry,
   traceSmoothClosedPath,
@@ -6,6 +7,13 @@ import {
 } from "../src/geometry/polygon.js";
 import { computeTileLayout } from "../src/export/mapMetadata.js";
 import { drawBiomeBase } from "../src/rendering/biomeRenderers.js";
+import { drawRecessedWater } from "../src/rendering/recessedWaterRenderer.js";
+import { drawRiverCascades } from "../src/rendering/cascadeRenderer.js";
+import { getRiverRoutes } from "../src/rendering/riverRoutes.js";
+import { drawRivers, protectRiverChannels } from "../src/rendering/riverRenderer.js";
+import { getFieldCityDrawItems } from "../src/rendering/fieldCityRenderer.js";
+import { getCloudDrawItems, drawCloudItem } from "../src/rendering/cloudRenderers.js";
+import { getBirdDrawItems, drawBirdItem } from "../src/rendering/birdRenderers.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
@@ -88,7 +96,8 @@ function drawFeatureIcon(ctx, x, y, feature, featureIcons = {}, size = 44) {
 }
 
 function collectAllTileObjectItems(drawnCells, layouts, config) {
-  const items = [];
+  const city = getFieldCityDrawItems(drawnCells, layouts, config);
+  const items = [...city];
 
   drawnCells.forEach((item, index) => {
     items.push(
@@ -101,7 +110,8 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
         layout: layouts[index],
         buildingSettings: config.buildingSettings,
         scenerySettings: config.scenerySettings,
-      }),
+        canvasSize: { width: config.width, height: config.height },
+      }).filter(object => !city.some(landmark => landmark.cellId === object.cellId)),
     );
   });
 
@@ -145,13 +155,29 @@ export function renderMapNode(ctx, cells, config) {
     );
   }
 
-  drawCurvedBorderNetwork(ctx, edgePaths);
+  const relief = drawRecessedWater(ctx, drawnCells, { ...config, createCanvas });
 
   const layouts = drawnCells.map((item) => computeTileLayout(item.poly, item.cell));
-  const objectItems = collectAllTileObjectItems(drawnCells, layouts, config);
+  const scenery = collectAllTileObjectItems(drawnCells, layouts, config);
+  const rivers = getRiverRoutes(drawnCells, layouts, scenery, config);
+  const objectItems = protectRiverChannels(scenery, rivers, drawnCells, config);
+  const clouds = getCloudDrawItems(drawnCells, layouts, objectItems, config);
+  drawRivers(ctx, drawnCells, rivers, { ...config, createCanvas });
+  drawRiverCascades(ctx, drawnCells, rivers, { ...config, createCanvas }, relief);
+  if (config.showBorders !== false) drawCurvedBorderNetwork(ctx, edgePaths);
 
-  for (const objectItem of objectItems) {
-    drawTileObjectItem(ctx, objectItem);
+  const layeredObjects = [...objectItems, ...clouds.filter((item) => item.layer === "mountain")]
+    .sort((a, b) => a.z - b.z || String(a.cellId).localeCompare(String(b.cellId)));
+
+  for (const objectItem of layeredObjects) {
+    if (objectItem.kind === "cloud") drawCloudItem(ctx, objectItem);
+    else drawTileObjectItem(ctx, objectItem);
+  }
+  for (const cloud of clouds) {
+    if (cloud.layer === "sky") drawCloudItem(ctx, cloud);
+  }
+  for (const bird of getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds)) {
+    drawBirdItem(ctx, bird);
   }
 
   for (let i = 0; i < drawnCells.length; i++) {

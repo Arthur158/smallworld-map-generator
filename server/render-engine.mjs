@@ -5,6 +5,8 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 
 import { makeMap } from "../src/generation/mapGenerator.js";
 import { renderMapNode } from "./render-map-node.mjs";
+import { CLOUD_ATLAS, prepareCloudAtlas } from "../src/rendering/cloudAtlasCatalog.js";
+import { LAND_ANIMAL_ATLAS, BIRD_ATLAS, FLOCK_ATLAS, prepareLandAnimalAtlas, prepareBirdAtlas, prepareFlockAtlas, addLandAnimalAssets } from "../src/rendering/wildlifeAtlasCatalog.js";
 import { BUILDING_ATLASES, addBuildingAsset, prepareBuildingAsset, prepareBuildingAtlas, useLegacyBuilding } from "../src/rendering/buildingAtlasCatalog.js";
 import {
   createMapMetadata,
@@ -22,12 +24,14 @@ export const DEFAULT_SETTINGS = {
   seed: "deniz-42",
 
   tileCount: 52,
+  showBorders: true,
+  showFieldCity: true,
   width: 1400,
   height: 900,
   shapeMode: "mainland",
 
   wobble: 11,
-  spread: 70,
+  spread: 0,
 
   tileShapeSettings: {
     chonkiness: 60,
@@ -42,6 +46,9 @@ export const DEFAULT_SETTINGS = {
   scenerySettings: {
     forestTreeSize: 100,
     mountainObjectSize: 100,
+    cloudDensity: 100,
+    birdDensity: 100,
+    riverCount: 2,
   },
 
   biomeWeights: {
@@ -63,7 +70,7 @@ export const DEFAULT_SETTINGS = {
 
   buildingSettings: {
     averagePerTile: 0.35,
-    maxPerTile: 1,
+    maxPerTile: 2,
     sizeMultiplier: 1,
     symbolBuildingChance: 100,
   },
@@ -161,6 +168,8 @@ export function normalizeSettings(input = {}) {
 
   return {
     seed: String(merged.seed || DEFAULT_SETTINGS.seed),
+    showBorders: merged.showBorders !== false,
+    showFieldCity: merged.showFieldCity !== false,
     // Optional: existing UI and training callers keep their original maps.
     preserveRegionCount: merged.preserveRegionCount === true,
 
@@ -255,6 +264,24 @@ export function normalizeSettings(input = {}) {
         35,
         240,
       ),
+      cloudDensity: clampNumber(
+        merged.scenerySettings?.cloudDensity,
+        DEFAULT_SETTINGS.scenerySettings.cloudDensity,
+        0,
+        200,
+      ),
+      birdDensity: clampNumber(
+        merged.scenerySettings?.birdDensity,
+        DEFAULT_SETTINGS.scenerySettings.birdDensity,
+        0,
+        200,
+      ),
+      riverCount: Math.round(clampNumber(
+        merged.scenerySettings?.riverCount ?? DEFAULT_SETTINGS.scenerySettings.riverCount,
+        DEFAULT_SETTINGS.scenerySettings.riverCount,
+        0,
+        6,
+      )),
     },
 
     biomeWeights: {
@@ -568,6 +595,12 @@ async function loadGroupedImageAssets(baseDir) {
     }
   }
 
+  addLandAnimalAssets(grouped, prepareLandAnimalAtlas(
+    await loadImage(path.join(ASSETS_DIR, "wildlife", LAND_ANIMAL_ATLAS.file)), createCanvas,
+  ));
+  addLandAnimalAssets(grouped, prepareFlockAtlas(
+    await loadImage(path.join(ASSETS_DIR, "wildlife", FLOCK_ATLAS.file)), createCanvas,
+  ));
   return grouped;
 }
 
@@ -608,6 +641,15 @@ async function loadSceneryTextures(baseAssetsDir) {
   return {
     forests,
     mountains,
+    clouds: prepareCloudAtlas(
+      await loadImage(path.join(baseAssetsDir, "clouds", CLOUD_ATLAS.file)),
+      createCanvas,
+    ),
+    birds: prepareBirdAtlas(
+      await loadImage(path.join(baseAssetsDir, "wildlife", BIRD_ATLAS.file)),
+      createCanvas,
+    ),
+    waterCliff: await loadImage(path.join(baseAssetsDir, "coasts", "recessed-rock.png")),
   };
 }
 

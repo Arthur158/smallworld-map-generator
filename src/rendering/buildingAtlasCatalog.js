@@ -1,3 +1,5 @@
+import { BUILDING_SIZE_PROFILES_BY_FILENAME } from "./buildingSizeRegistry.js";
+
 // Shared by the browser and server renderers. Keep the original settlement
 // sheets and add quieter infrastructure, ruins and terrain-specific landmarks.
 const settlementSets = {
@@ -46,6 +48,82 @@ const structureSets = {
   ],
 };
 
+// Reviewed painting by painting at a 1000px game viewport, beside the standard
+// 62px mountain and 44px tree. Homes need readable roofs; wells and small props
+// need much smaller footprints. Final caps keep the game's 2–3x size setting
+// from growing either category back to the generic 84px scenery limit.
+const buildingModelSizes = {
+  "field-barn": { renderSize: 30, maxRenderSize: 50 },
+  "field-chapel": { renderSize: 34, maxRenderSize: 50 },
+  "field-dovecote": { renderSize: 24, maxRenderSize: 34 },
+  "field-farmstead": { renderSize: 32, maxRenderSize: 52 },
+  "field-granary-silo": { renderSize: 26, maxRenderSize: 40 },
+  "field-hamlet": { renderSize: 36, maxRenderSize: 56 },
+  "field-market-stall": { renderSize: 20, maxRenderSize: 30 },
+  "field-observatory": { renderSize: 34, maxRenderSize: 50 },
+  "field-quarry-crane": { renderSize: 28, maxRenderSize: 44 },
+  "field-stone-gate": { renderSize: 30, maxRenderSize: 48 },
+  "field-sundial-sanctuary": { renderSize: 28, maxRenderSize: 44 },
+  "field-timber-pithead": { renderSize: 28, maxRenderSize: 44 },
+  "field-village-well": { renderSize: 20, maxRenderSize: 26 },
+  "field-wayside-oratory": { renderSize: 20, maxRenderSize: 30 },
+  "field-windmill": { renderSize: 34, maxRenderSize: 48 },
+  "forest-charcoal-kiln": { renderSize: 24, maxRenderSize: 36 },
+  "forest-druid-altar": { renderSize: 24, maxRenderSize: 36 },
+  "forest-forest-quarry": { renderSize: 28, maxRenderSize: 44 },
+  "forest-forester-cabin": { renderSize: 26, maxRenderSize: 42 },
+  "forest-hunter-lodge": { renderSize: 30, maxRenderSize: 48 },
+  "forest-log-palisade": { renderSize: 30, maxRenderSize: 48 },
+  "forest-ranger-platform": { renderSize: 28, maxRenderSize: 44 },
+  "forest-root-shaft": { renderSize: 26, maxRenderSize: 40 },
+  "forest-ruined-gateway": { renderSize: 30, maxRenderSize: 48 },
+  "forest-sawmill-shelter": { renderSize: 28, maxRenderSize: 44 },
+  "forest-stump-house": { renderSize: 28, maxRenderSize: 46 },
+  "forest-wizard-cottage": { renderSize: 28, maxRenderSize: 44 },
+  "forest-woodland-well": { renderSize: 20, maxRenderSize: 26 },
+  "grass-beacon-tower": { renderSize: 30, maxRenderSize: 46 },
+  "grass-cottages": { renderSize: 34, maxRenderSize: 56 },
+  "grass-hilltop-dolmen": { renderSize: 26, maxRenderSize: 40 },
+  "grass-livestock-enclosure": { renderSize: 26, maxRenderSize: 40 },
+  "grass-millhouse": { renderSize: 28, maxRenderSize: 44 },
+  "grass-pasture-well": { renderSize: 20, maxRenderSize: 28 },
+  "grass-quarry-winch": { renderSize: 26, maxRenderSize: 40 },
+  "grass-shepherd-croft": { renderSize: 28, maxRenderSize: 46 },
+  "grass-shepherd-shelter": { renderSize: 24, maxRenderSize: 36 },
+  "grass-standing-stones": { renderSize: 28, maxRenderSize: 44 },
+  "grass-stone-labyrinth": { renderSize: 30, maxRenderSize: 48 },
+  "grass-watchtower": { renderSize: 32, maxRenderSize: 48 },
+  "grass-wayside-inn": { renderSize: 32, maxRenderSize: 50 },
+  "mountain-alpine-chalet": { renderSize: 28, maxRenderSize: 46 },
+  "mountain-dwarven-watchpost": { renderSize: 32, maxRenderSize: 48 },
+  "mountain-monastery": { renderSize: 36, maxRenderSize: 56 },
+  "mountain-mountaineer-refuge": { renderSize: 28, maxRenderSize: 44 },
+  "mountain-ore-crane": { renderSize: 28, maxRenderSize: 44 },
+  "mountain-pass-beacon": { renderSize: 28, maxRenderSize: 44 },
+  "mountain-ridge-gate": { renderSize: 30, maxRenderSize: 48 },
+  "mountain-snowbound-altar": { renderSize: 24, maxRenderSize: 36 },
+  "mountain-stone-cistern": { renderSize: 22, maxRenderSize: 34 },
+  "mountain-timber-cabin": { renderSize: 26, maxRenderSize: 42 },
+  "mountain-timber-lift": { renderSize: 28, maxRenderSize: 44 },
+  "swamp-bog-iron-pit": { renderSize: 26, maxRenderSize: 42 },
+  "swamp-bog-stone-circle": { renderSize: 28, maxRenderSize: 44 },
+  "swamp-fishing-shack": { renderSize: 26, maxRenderSize: 42 },
+  "swamp-peat-cutting-works": { renderSize: 28, maxRenderSize: 44 },
+  "swamp-peat-mine": { renderSize: 26, maxRenderSize: 42 },
+  "swamp-plank-lookout": { renderSize: 30, maxRenderSize: 46 },
+  "swamp-reed-fishery": { renderSize: 26, maxRenderSize: 42 },
+  "swamp-reed-hamlet": { renderSize: 34, maxRenderSize: 56 },
+  "swamp-reed-hut": { renderSize: 24, maxRenderSize: 40 },
+  "swamp-ruined-chapel": { renderSize: 32, maxRenderSize: 48 },
+  "swamp-stilt-storehouse": { renderSize: 28, maxRenderSize: 44 },
+  "swamp-wicker-fish-traps": { renderSize: 20, maxRenderSize: 28 },
+  "swamp-witch-cottage": { renderSize: 28, maxRenderSize: 44 },
+};
+
+function modelSizing(name, renderSize) {
+  return buildingModelSizes[name] ?? { renderSize };
+}
+
 const settlementAtlases = Object.entries(settlementSets).map(([biome, names]) => ({
   biome,
   file: `${biome}-settlements.png`,
@@ -55,7 +133,7 @@ const settlementAtlases = Object.entries(settlementSets).map(([biome, names]) =>
   sprites: names.map((name, index) => ({
     name: `${biome}-${name}`,
     feature: index < 4 ? null : index < 6 ? "magic" : index === 6 ? "mine" : "cave",
-    renderSize: [30, 30, 34, 38, 34, 36, 36, 34][index],
+    ...modelSizing(`${biome}-${name}`, [30, 30, 34, 38, 34, 36, 36, 34][index]),
   })),
 }));
 
@@ -95,23 +173,84 @@ const structureAtlases = Object.entries(structureSets).map(([biome, models]) => 
   sprites: models.map(([name, renderSize], index) => ({
     name: `${biome}-${name}`,
     feature: index < 6 ? null : index < 8 ? "magic" : index < 10 ? "mine" : "cave",
-    renderSize,
+    ...modelSizing(`${biome}-${name}`, renderSize),
   })),
 }));
 
-export const BUILDING_ATLASES = [...settlementAtlases, ...structureAtlases];
+// Both lakes and seas use the sea biome. Suitability and rarity are rendering
+// metadata only: the decorative objects never become gameplay features.
+const waterSprite = (name, renderSize, waterKinds, weight = 1, rare = false) => ({
+  name: `water-${name}`, feature: null, renderSize, waterKinds, weight, rare,
+});
+const bothWaters = ["sea", "lake"];
+const waterAtlases = [
+  {
+    biome: "sea", file: "water-vessels.png", columns: 4, rows: 3,
+    rowFractions: [0, 0.33702, 0.67956, 1],
+    columnFractions: [[0, 0.25483, 0.50552, 0.76174, 1], [0, 0.27348, 0.51588, 0.77279, 1], [0, 0.26796, 0.51519, 0.76243, 1]],
+    sprites: [
+      waterSprite("smooth-rocks", 32, bothWaters, 1.3),
+      waterSprite("sea-stack-arch", 36, ["sea"]),
+      waterSprite("lighthouse", 38, ["sea"], 0.8),
+      waterSprite("stilt-fishery", 34, bothWaters),
+      waterSprite("drowned-watchtower", 34, bothWaters, 0.8),
+      waterSprite("sunken-arch", 32, bothWaters, 0.8),
+      waterSprite("mooring-buoys", 28, ["sea"]),
+    ].map((sprite, index) => ({ ...sprite, frameIndex: index + 4 })),
+  },
+  {
+    biome: "sea", file: "water-wildlife.png", columns: 4, rows: 3,
+    rowFractions: [0, 0.36648, 0.69797, 1],
+    columnFractions: [[0, 0.25138, 0.48895, 0.77555, 1], [0, 0.28177, 0.51174, 0.73273, 1], [0, 0.25414, 0.51588, 0.73412, 1]],
+    // Keep original sheet frames: frame 0 (single dolphin) and frame 5
+    // (lily pads) are deliberately excluded from decoration selection.
+    sprites: [
+      [1, { ...waterSprite("dolphin-pair", 32, ["sea"], 1.2), maxRenderSize: 44 }],
+      [2, waterSprite("surfacing-whale", 44, ["sea"], 1, true)],
+      [3, waterSprite("whale-fluke", 38, ["sea"], 1, true)],
+      [4, waterSprite("lake-creature", 44, ["lake"], 1, true)],
+      [6, waterSprite("reeds", 30, ["lake"])],
+      [7, { ...waterSprite("driftwood", 16, bothWaters), minRenderSize: 8, maxRenderSize: 24 }],
+      [8, { ...waterSprite("gull-rock", 8, ["sea"]), minRenderSize: 6, maxRenderSize: 18 }],
+      [9, { ...waterSprite("otter-rock", 8, ["lake"]), minRenderSize: 6, maxRenderSize: 18 }],
+      [10, waterSprite("leaping-fish", 28, bothWaters)],
+      [11, waterSprite("mossy-rocks", 30, ["lake"], 1.3)],
+    ].map(([frameIndex, sprite]) => ({ ...sprite, frameIndex })),
+  },
+  {
+    biome: "sea", file: "water-fleet.png", columns: 3, rows: 2,
+    rowFractions: [0, 0.52734, 1],
+    columnFractions: [[0, 0.33464, 0.67643, 1], [0, 0.35091, 0.72135, 1]],
+    sprites: [
+      waterSprite("merchant-cog", 38, bothWaters, 1.2),
+      waterSprite("fishing-vessel", 38, bothWaters, 1.2),
+      waterSprite("merchant-schooner", 42, ["sea"], 1.2),
+      waterSprite("cargo-barge", 36, bothWaters),
+      waterSprite("wrecked-merchantman", 40, ["sea"], 0.8),
+      { ...waterSprite("dolphin-duo", 32, ["sea"], 1.4), maxRenderSize: 44 },
+    ],
+  },
+];
+
+export const BUILDING_ATLASES = [...settlementAtlases, ...structureAtlases, ...waterAtlases];
 
 export function addBuildingAsset(textures, biome, asset) {
   if (!asset.sourceRect) return;
   const group = textures[biome] ??= { default: [], magic: [], mine: [], cave: [] };
+  // The grand city is selected once per map, never by the per-region lottery.
+  if (biome === "field" && asset.name === "city.png") {
+    (group.landmarks ??= []).push(asset);
+    return;
+  }
   group[asset.feature ?? "default"].push(asset);
 }
 
 // Keep the quieter original settlements and mine variants alongside the new
 // paintings. Former cave art included churches/volcanoes, while several old
-// castles and magic towers use a bright, unrelated palette.
+// castles and magic towers use a bright, unrelated palette. The grand city
+// uses opt-out landmark placement instead of joining ordinary houses.
 export function useLegacyBuilding(name, feature) {
-  return feature === "mine" || (!feature && !["city.png", "whitecastle.png"].includes(name));
+  return feature === "mine" || (!feature && name !== "whitecastle.png");
 }
 
 // Trimming affects only artwork placement, never generated map data. Use the
@@ -146,14 +285,19 @@ export function readArtwork(image, createCanvas) {
 
 export function prepareBuildingAsset(image, metadata, createCanvas) {
   const { pixels, width, height } = readArtwork(image, createCanvas);
-  return { ...metadata, image, sourceRect: findArtworkBounds(pixels, width, height) };
+  // The original farm, village, mill and mining sheds need the same per-model
+  // scale calibration in both browser and Node asset loading.
+  return { ...metadata, ...(BUILDING_SIZE_PROFILES_BY_FILENAME[metadata.name] ?? {}),
+    image, sourceRect: findArtworkBounds(pixels, width, height) };
 }
 
 export function prepareBuildingAtlas(image, atlas, createCanvas) {
   const { pixels, width, height } = readArtwork(image, createCanvas);
   return atlas.sprites.map((sprite, index) => {
-    const row = Math.floor(index / atlas.columns);
-    const column = index % atlas.columns;
+    // Reuse the unchanged paintings when selected sprites get replacement art.
+    const frameIndex = sprite.frameIndex ?? index;
+    const row = Math.floor(frameIndex / atlas.columns);
+    const column = frameIndex % atlas.columns;
     // Painted silhouettes sometimes need a boundary in the adjacent alpha gap.
     // Overrides are per row; omitted rows retain the original equal grid.
     const columnFractions = atlas.columnFractions?.[row];

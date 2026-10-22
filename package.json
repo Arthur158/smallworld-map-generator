@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "test:rendering": "node --test src/rendering/*.test.mjs",
+    "test:names": "node --test src/generation/continentNames.test.mjs src/export/mapMetadata.test.mjs",
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",

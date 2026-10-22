@@ -2,7 +2,7 @@
   "seed": "api-demo-42",
   "tileCount": 56,
   "wobble": 12,
-  "spread": 68,
+  "spread": 0,
   "width": 1400,
   "height": 900,
   "shapeMode": "mainland",

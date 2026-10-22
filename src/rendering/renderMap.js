@@ -6,7 +6,14 @@ import {
 } from "../geometry/polygon.js";
 import { computeTileLayout } from "../export/mapMetadata.js";
 import { drawBiomeBase } from "./biomeRenderers.js";
+import { drawRecessedWater } from "./recessedWaterRenderer.js";
+import { drawRiverCascades } from "./cascadeRenderer.js";
+import { getRiverRoutes } from "./riverRoutes.js";
+import { drawRivers, protectRiverChannels } from "./riverRenderer.js";
 import { drawFeatureIcon } from "./icons.js";
+import { getFieldCityDrawItems } from "./fieldCityRenderer.js";
+import { getCloudDrawItems, drawCloudItem } from "./cloudRenderers.js";
+import { getBirdDrawItems, drawBirdItem } from "./birdRenderers.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
@@ -78,7 +85,8 @@ function drawCurvedBorderNetwork(ctx, edgePaths) {
 }
 
 function collectAllTileObjectItems(drawnCells, layouts, config) {
-  const items = [];
+  const city = getFieldCityDrawItems(drawnCells, layouts, config);
+  const items = [...city];
 
   drawnCells.forEach((item, index) => {
     items.push(
@@ -91,7 +99,8 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
         layout: layouts[index],
         buildingSettings: config.buildingSettings,
         scenerySettings: config.scenerySettings,
-      }),
+        canvasSize: { width: config.width, height: config.height },
+      }).filter(object => !city.some(landmark => landmark.cellId === object.cellId)),
     );
   });
 
@@ -135,13 +144,29 @@ export function renderMap(ctx, cells, config) {
     );
   }
 
-  drawCurvedBorderNetwork(ctx, edgePaths);
+  const relief = drawRecessedWater(ctx, drawnCells, config);
 
   const layouts = drawnCells.map((item) => computeTileLayout(item.poly, item.cell));
-  const objectItems = collectAllTileObjectItems(drawnCells, layouts, config);
+  const scenery = collectAllTileObjectItems(drawnCells, layouts, config);
+  const rivers = getRiverRoutes(drawnCells, layouts, scenery, config);
+  const objectItems = protectRiverChannels(scenery, rivers, drawnCells, config);
+  const clouds = getCloudDrawItems(drawnCells, layouts, objectItems, config);
+  drawRivers(ctx, drawnCells, rivers, config);
+  drawRiverCascades(ctx, drawnCells, rivers, config, relief);
+  if (config.showBorders !== false) drawCurvedBorderNetwork(ctx, edgePaths);
 
-  for (const objectItem of objectItems) {
-    drawTileObjectItem(ctx, objectItem);
+  const layeredObjects = [...objectItems, ...clouds.filter((item) => item.layer === "mountain")]
+    .sort((a, b) => a.z - b.z || String(a.cellId).localeCompare(String(b.cellId)));
+
+  for (const objectItem of layeredObjects) {
+    if (objectItem.kind === "cloud") drawCloudItem(ctx, objectItem);
+    else drawTileObjectItem(ctx, objectItem);
+  }
+  for (const cloud of clouds) {
+    if (cloud.layer === "sky") drawCloudItem(ctx, cloud);
+  }
+  for (const bird of getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds)) {
+    drawBirdItem(ctx, bird);
   }
 
   for (let i = 0; i < drawnCells.length; i++) {

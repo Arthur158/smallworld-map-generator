@@ -1,3 +1,16 @@
+import cloudAtlasUrl from "../assets/clouds/painted-clouds.png?url";
+import { prepareCloudAtlas } from "./cloudAtlasCatalog.js";
+import birdAtlasUrl from "../assets/wildlife/flying-birds.png?url";
+import waterCliffUrl from "../assets/coasts/recessed-rock.png?url";
+import { prepareBirdAtlas } from "./wildlifeAtlasCatalog.js";
+
+function createCanvas(width, height) {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
 const forestModules = {
   ...import.meta.glob(
     "../assets/forests/**/*.{png,jpg,jpeg,webp,avif}",
@@ -97,5 +110,8 @@ export async function loadSceneryTextures() {
   return {
     forests,
     mountains,
+    clouds: prepareCloudAtlas(await loadImage(cloudAtlasUrl), createCanvas),
+    birds: prepareBirdAtlas(await loadImage(birdAtlasUrl), createCanvas),
+    waterCliff: await loadImage(waterCliffUrl),
   };
 }

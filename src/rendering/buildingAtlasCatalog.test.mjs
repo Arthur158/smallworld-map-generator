@@ -196,19 +196,20 @@ test('ordinary assets receive the same trimming and preserve their render metada
 });
 
 test('catalog adds structure variety to every biome without replacing settlement sheets', () => {
-  assert.deepEqual([...new Set(BUILDING_ATLASES.map(atlas => atlas.biome))].sort(),
+  const landAtlases = BUILDING_ATLASES.filter(atlas => atlas.biome !== 'sea');
+  assert.deepEqual([...new Set(landAtlases.map(atlas => atlas.biome))].sort(),
     ['field', 'forest', 'grass', 'mountain', 'swamp']);
-  assert.equal(new Set(BUILDING_ATLASES.map(atlas => atlas.file)).size, 10);
+  assert.equal(new Set(landAtlases.map(atlas => atlas.file)).size, 10);
   const names = new Set();
   const textures = {};
-  for (const atlas of BUILDING_ATLASES) {
+  for (const atlas of landAtlases) {
     assert.equal(atlas.sprites.length, atlas.columns * atlas.rows);
     assert.match(atlas.file, /^[a-z-]+\.png$/);
     for (const sprite of atlas.sprites) {
       assert(!names.has(sprite.name), `duplicate model name: ${sprite.name}`);
       names.add(sprite.name);
       assert.match(sprite.name, /^[a-z-]+$/);
-      assert(sprite.renderSize >= 28 && sprite.renderSize <= 38, `oversized structure: ${sprite.name}`);
+      assert(sprite.renderSize >= 20 && sprite.renderSize <= 38, `oversized structure: ${sprite.name}`);
       addBuildingAsset(textures, atlas.biome, { ...sprite, sourceRect: { x: 0, y: 0, width: 10, height: 10 } });
     }
   }
@@ -221,6 +222,55 @@ test('catalog adds structure variety to every biome without replacing settlement
     assert.deepEqual(settlement.sprites.map(sprite => sprite.feature), [null, null, null, null, 'magic', 'magic', 'mine', 'cave']);
   }
   assert.equal(names.size, 100);
+});
+
+test('water catalog supplies distinct sea and lake scenery with rare large creatures', () => {
+  const atlases = BUILDING_ATLASES.filter(atlas => atlas.biome === 'sea');
+  assert.equal(atlases.length, 3);
+  const models = atlases.flatMap(atlas => atlas.sprites);
+  assert.equal(models.length, 23);
+  assert.equal(new Set(BUILDING_ATLASES.flatMap(atlas => atlas.sprites.map(sprite => sprite.name))).size, 123);
+  for (const atlas of atlases) {
+    const frames = atlas.sprites.map((sprite, index) => sprite.frameIndex ?? index);
+    assert.equal(new Set(frames).size, frames.length);
+    assert(frames.every(index => index >= 0 && index < atlas.columns * atlas.rows));
+    for (const sprite of atlas.sprites) {
+      assert.equal(sprite.feature, null);
+      if (['water-gull-rock', 'water-otter-rock'].includes(sprite.name)) {
+        assert.equal(sprite.renderSize, 8);
+        assert.equal(sprite.minRenderSize, 6);
+        assert.equal(sprite.maxRenderSize, 18);
+      } else if (sprite.name === 'water-driftwood') {
+        assert.equal(sprite.renderSize, 16);
+        assert.equal(sprite.minRenderSize, 8);
+        assert.equal(sprite.maxRenderSize, 24);
+      } else {
+        assert(sprite.renderSize >= 28 && sprite.renderSize <= 44);
+      }
+      assert(sprite.weight > 0);
+      assert(sprite.waterKinds.length > 0);
+      assert(sprite.waterKinds.every(kind => ['sea', 'lake'].includes(kind)));
+    }
+  }
+  for (const name of ['dolphin-duo', 'dolphin-pair', 'surfacing-whale', 'whale-fluke']) {
+    assert.deepEqual(models.find(sprite => sprite.name === `water-${name}`).waterKinds, ['sea']);
+  }
+  assert.deepEqual(models.find(sprite => sprite.name === 'water-lake-creature').waterKinds, ['lake']);
+  assert.deepEqual(models.filter(sprite => sprite.rare).map(sprite => sprite.name),
+    ['water-surfacing-whale', 'water-whale-fluke', 'water-lake-creature']);
+});
+
+test('sparse atlases retain original frames when selected models are replaced', () => {
+  const buffer = pixelBuffer(80, 40);
+  buffer.fill(5, 5, 4, 4);
+  buffer.fill(45, 25, 4, 4);
+  const image = { width: 80, height: 40 };
+  const factory = canvasFactory(image, buffer.pixels, 80, 40);
+  const assets = prepareBuildingAtlas(image, {
+    columns: 4, rows: 2, sprites: [{ name: 'kept', frameIndex: 6 }],
+  }, factory.createCanvas);
+  assert.equal(assets.length, 1);
+  assert.deepEqual(assets[0].sourceRect, { x: 43, y: 23, width: 8, height: 8 });
 });
 
 test('special structures are assigned only to their corresponding region feature', () => {
@@ -288,8 +338,22 @@ test('three-row structure sheets keep every frame separate through browser and N
 test('adding structure atlases retains the quiet legacy settlement and mine artwork', () => {
   assert.equal(useLegacyBuilding('cottage.png', null), true);
   assert.equal(useLegacyBuilding('mine.png', 'mine'), true);
-  assert.equal(useLegacyBuilding('city.png', null), false);
+  assert.equal(useLegacyBuilding('city.png', null), true);
   assert.equal(useLegacyBuilding('whitecastle.png', null), false);
   assert.equal(useLegacyBuilding('tower.png', 'magic'), false);
   assert.equal(useLegacyBuilding('church.png', 'cave'), false);
+});
+
+test('the grand city loads only into the landmark pool, never ordinary field scenery', () => {
+  const city = { name: 'city.png', image: { width: 1280, height: 1280 },
+    sourceRect: { x: 140, y: 140, width: 980, height: 950 } };
+  const cottage = { ...city, name: 'cottage.png' };
+  const textures = {};
+  addBuildingAsset(textures, 'field', cottage);
+  addBuildingAsset(textures, 'field', city);
+  assert.deepEqual(textures.field.landmarks, [city]);
+  assert.deepEqual(textures.field.default, [cottage]);
+  for (const bucket of ['default', 'magic', 'mine', 'cave']) {
+    assert(!textures.field[bucket].some(asset => asset.name === 'city.png'));
+  }
 });

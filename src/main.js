@@ -25,12 +25,14 @@ let assetsReady = false;
 export const DEFAULT_SETTINGS = {
   seed: "deniz-42",
   tileCount: 52,
+  showBorders: true,
+  showFieldCity: true,
   wobble: 11,
   tileShapeSettings: {
     chonkiness: 60,
     repulsionSteps: 5,
   },
-  spread: 70,
+  spread: 0,
   waterSettings: {
     centerLakeSize: 100,
     seaSize: 100,
@@ -38,6 +40,9 @@ export const DEFAULT_SETTINGS = {
   scenerySettings: {
     forestTreeSize: 100,
     mountainObjectSize: 100,
+    cloudDensity: 100,
+    birdDensity: 100,
+    riverCount: 2,
   },
   biomeWeights: {
     field: 100,
@@ -59,7 +64,7 @@ export const DEFAULT_SETTINGS = {
   },
   buildingSettings: {
     averagePerTile: 0.35,
-    maxPerTile: 1,
+    maxPerTile: 2,
     sizeMultiplier: 1,
     symbolBuildingChance: 100,
   },
@@ -141,6 +146,8 @@ function normalizeSettings(input = {}) {
 
   return {
     seed: String(merged.seed || DEFAULT_SETTINGS.seed),
+    showBorders: merged.showBorders !== false,
+    showFieldCity: merged.showFieldCity !== false,
     tileCount: Math.round(clampNumber(merged.tileCount, DEFAULT_SETTINGS.tileCount, 18, 120)),
     wobble: clampNumber(merged.wobble, DEFAULT_SETTINGS.wobble, 0, 30),
     tileShapeSettings: {
@@ -190,6 +197,24 @@ function normalizeSettings(input = {}) {
         35,
         240,
       ),
+      cloudDensity: clampNumber(
+        merged.scenerySettings?.cloudDensity,
+        DEFAULT_SETTINGS.scenerySettings.cloudDensity,
+        0,
+        200,
+      ),
+      birdDensity: clampNumber(
+        merged.scenerySettings?.birdDensity,
+        DEFAULT_SETTINGS.scenerySettings.birdDensity,
+        0,
+        200,
+      ),
+      riverCount: Math.round(clampNumber(
+        merged.scenerySettings?.riverCount ?? DEFAULT_SETTINGS.scenerySettings.riverCount,
+        DEFAULT_SETTINGS.scenerySettings.riverCount,
+        0,
+        6,
+      )),
     },
     biomeWeights: {
       field: clampNumber(merged.biomeWeights?.field, DEFAULT_SETTINGS.biomeWeights.field, 0, 300),
@@ -272,6 +297,8 @@ function makeRenderableConfig(settings) {
 function readSettingsFromDom() {
   return normalizeSettings({
     seed: document.getElementById("seed")?.value,
+    showBorders: document.getElementById("showBorders")?.checked,
+    showFieldCity: document.getElementById("showFieldCity")?.checked,
     tileCount: document.getElementById("tileCount")?.value,
     wobble: document.getElementById("wobble")?.value,
     tileShapeSettings: {
@@ -289,6 +316,9 @@ function readSettingsFromDom() {
     scenerySettings: {
       forestTreeSize: document.getElementById("forestTreeSize")?.value,
       mountainObjectSize: document.getElementById("mountainObjectSize")?.value,
+      cloudDensity: document.getElementById("cloudDensity")?.value,
+      birdDensity: document.getElementById("birdDensity")?.value,
+      riverCount: document.getElementById("riverCount")?.value,
     },
     biomeWeights: {
       field: document.getElementById("fieldBiomeWeight")?.value,
@@ -350,6 +380,8 @@ function syncDomFromSettings(settings) {
   canvas.height = settings.height;
 
   setValue("seed", settings.seed);
+  setChecked("showBorders", settings.showBorders !== false);
+  setChecked("showFieldCity", settings.showFieldCity !== false);
   setValue("tileCount", settings.tileCount);
   setValue("wobble", settings.wobble);
   setValue("tileChonkiness", settings.tileShapeSettings.chonkiness);
@@ -362,6 +394,10 @@ function syncDomFromSettings(settings) {
 
   setValue("forestTreeSize", settings.scenerySettings.forestTreeSize);
   setValue("mountainObjectSize", settings.scenerySettings.mountainObjectSize);
+  setValue("cloudDensity", settings.scenerySettings.cloudDensity);
+  setValue("birdDensity", settings.scenerySettings.birdDensity);
+  setValue("riverCount", settings.scenerySettings.riverCount);
+  syncRiverHint();
 
   setValue("fieldBiomeWeight", settings.biomeWeights.field);
   setValue("grassBiomeWeight", settings.biomeWeights.grass);
@@ -397,6 +433,8 @@ function syncDomFromSettings(settings) {
 }
 
 function exposeGeneratedData(cells, metadata) {
+  document.getElementById("regionName").textContent = metadata.regionName;
+  canvas.setAttribute("aria-label", `Map of ${metadata.regionName}`);
   window.lastGeneratedMap = cells.map((cell) => ({
     id: cell.id,
     site: cell.site,
@@ -499,6 +537,15 @@ function on(id, event, handler) {
   const element = document.getElementById(id);
   if (element) element.addEventListener(event, handler);
 }
+
+function syncRiverHint() {
+  const input = document.getElementById("riverCount");
+  if (!input) return;
+  const count = Math.round(clampNumber(input.value, DEFAULT_SETTINGS.scenerySettings.riverCount, 0, 6));
+  input.title = `Up to ${count} short rivers, each crossing at most four land regions. Routes need a mountain or map-edge source and a water outlet. Zero turns rivers off.`;
+}
+
+on("riverCount", "input", syncRiverHint);
 
 on("generate", "click", () => {
   regenerateFromUi();

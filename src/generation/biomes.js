@@ -178,7 +178,7 @@ export function assignBiomes(cells, config, rng) {
   // UI value is 0..100.
   // 0 = sparse / far apart.
   // 100 = gathered / clustered.
-  const spread = clamp((config.spread ?? 70) / 100, 0, 1);
+  const spread = clamp((config.spread ?? 0) / 100, 0, 1);
 
   const quotas = makeQuotas(landCells, biomeKeys, config, rng);
   const remaining = { ...quotas };

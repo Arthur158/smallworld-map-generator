@@ -269,8 +269,9 @@ export function collectTileObjectDrawItems({
   layout = null,
   buildingSettings = {},
   scenerySettings = {},
+  canvasSize = null,
 }) {
-  const buildings = getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings);
+  const buildings = getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings, canvasSize);
   const scenery = [];
   if (cell.biome === "forest") {
     scenery.push(...makeForestDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));
