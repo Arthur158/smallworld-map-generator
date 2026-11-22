@@ -5,6 +5,7 @@ import { buildSharedCurvedGeometry } from '../geometry/polygon.js';
 import { drawRecessedWater } from './recessedWaterRenderer.js';
 import { getCascadeProfiles } from './cascadeGeometry.js';
 import { riverRibbon } from './riverRenderer.js';
+import { drawRiverCascades } from './cascadeRenderer.js';
 
 function rectangle(id, biome, x, y, width, height) {
   return { id, biome, buildings: [], polygon: [
@@ -116,4 +117,43 @@ test('profiles are deterministic, scale with the map, and preserve inputs and re
   assert.equal(JSON.stringify(full.drawnCells), beforeCells);
   assert.deepEqual(Buffer.from(full.relief.waterMask.getContext('2d').getImageData(0, 0, 1400, 900).data), beforeWater);
   assert.deepEqual(Buffer.from(full.relief.cliffMask.getContext('2d').getImageData(0, 0, 1400, 900).data), beforeCliff);
+});
+
+
+function steepShore(slope, scale) {
+  const length = Math.hypot(slope, 1), normal = { x: -slope / length, y: 1 / length };
+  const box = [{ x: 20, y: 20 }, { x: 1380, y: 20 }, { x: 1380, y: 880 }, { x: 20, y: 880 }];
+  const half = side => {
+    const points = [], distance = p => side * ((p.x - 700) * normal.x + (p.y - 450) * normal.y);
+    for (let i = 0; i < box.length; i++) {
+      const a = box[i], b = box[(i + 1) % box.length], da = distance(a), db = distance(b);
+      if (da >= 0) points.push(a);
+      if ((da >= 0) !== (db >= 0)) {
+        const t = da / (da - db);
+        points.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+      }
+    }
+    return points.map(({ x, y }) => ({ x: x * scale, y: y * scale }));
+  };
+  const input = scene([{ id: 'land', biome: 'field', buildings: [], polygon: half(-1) },
+    { id: 'water', biome: 'sea', buildings: [], polygon: half(1) }], config(scale));
+  const points = Array.from({ length: 21 }, (_, i) => ({
+    x: (700 - normal.x * (80 - i * 4)) * scale, y: (450 - normal.y * (80 - i * 4)) * scale,
+  }));
+  return { ...input, river: { id: 'river-1', source: { kind: 'mountain' }, points,
+    mouth: { kind: 'water', cellId: 'water', point: points.at(-1) } } };
+}
+
+test('nearly horizontal rivers retain visible cascades on either steep shore at both map scales', () => {
+  for (const scale of [0.5, 1]) for (const slope of [-80, -20, -6, 6, 20, 80]) {
+    const input = steepShore(slope, scale);
+    const profiles = getCascadeProfiles([input.river], input.drawnCells, input.config, input.relief);
+    assert.equal(profiles.length, 1, `visible shore slope ${slope} at scale ${scale} needs a cascade`);
+    const layer = createCanvas(input.config.width, input.config.height), paint = layer.getContext('2d');
+    drawRiverCascades(paint, input.drawnCells, [input.river], input.config, input.relief);
+    const image = paint.getImageData(650 * scale, 410 * scale, 100 * scale, 120 * scale).data;
+    let visible = 0;
+    for (let i = 3; i < image.length; i += 4) if (image[i] >= 64) visible++;
+    assert(visible > 25 * scale * scale, `side-on cascade must remain visible at slope ${slope}`);
+  }
 });

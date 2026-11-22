@@ -6,7 +6,7 @@ import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { makeMap } from "../src/generation/mapGenerator.js";
 import { renderMapNode } from "./render-map-node.mjs";
 import { CLOUD_ATLAS, prepareCloudAtlas } from "../src/rendering/cloudAtlasCatalog.js";
-import { LAND_ANIMAL_ATLAS, BIRD_ATLAS, FLOCK_ATLAS, prepareLandAnimalAtlas, prepareBirdAtlas, prepareFlockAtlas, addLandAnimalAssets } from "../src/rendering/wildlifeAtlasCatalog.js";
+import { LAND_ANIMAL_ATLAS, BIRD_ATLAS, FLOCK_ATLAS, DRAGON_ASSETS, prepareDragonAsset, prepareLandAnimalAtlas, prepareBirdAtlas, prepareFlockAtlas, addLandAnimalAssets } from "../src/rendering/wildlifeAtlasCatalog.js";
 import { BUILDING_ATLASES, addBuildingAsset, prepareBuildingAsset, prepareBuildingAtlas, useLegacyBuilding } from "../src/rendering/buildingAtlasCatalog.js";
 import {
   createMapMetadata,
@@ -48,6 +48,7 @@ export const DEFAULT_SETTINGS = {
     mountainObjectSize: 100,
     cloudDensity: 100,
     birdDensity: 100,
+    dragonCount: 2,
     riverCount: 2,
   },
 
@@ -276,6 +277,12 @@ export function normalizeSettings(input = {}) {
         0,
         200,
       ),
+      dragonCount: Math.round(clampNumber(
+        merged.scenerySettings?.dragonCount ?? DEFAULT_SETTINGS.scenerySettings.dragonCount,
+        DEFAULT_SETTINGS.scenerySettings.dragonCount,
+        0,
+        12,
+      )),
       riverCount: Math.round(clampNumber(
         merged.scenerySettings?.riverCount ?? DEFAULT_SETTINGS.scenerySettings.riverCount,
         DEFAULT_SETTINGS.scenerySettings.riverCount,
@@ -649,6 +656,9 @@ async function loadSceneryTextures(baseAssetsDir) {
       await loadImage(path.join(baseAssetsDir, "wildlife", BIRD_ATLAS.file)),
       createCanvas,
     ),
+    dragons: await Promise.all(DRAGON_ASSETS.map(async name => prepareDragonAsset(
+      await loadImage(path.join(baseAssetsDir, "wildlife", name)), name, createCanvas,
+    ))),
     waterCliff: await loadImage(path.join(baseAssetsDir, "coasts", "recessed-rock.png")),
   };
 }

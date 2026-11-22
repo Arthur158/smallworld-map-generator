@@ -1,0 +1,17 @@
+{
+  "tool": "built-in image_gen",
+  "assets": [
+    {
+      "file": "dragon-russet.png",
+      "prompt": "Use case: stylized-concept. Asset type: one transparent PNG game sprite, flying dragon for a hand-painted European fantasy board-game map. A single russet red dragon fully airborne in a broad gliding pose, seen from above at a gentle elevated three-quarter angle; all four legs tucked in, two large leathery wings stretched out, narrow neck with small horned head, long tapering curved tail. Head points toward upper-right, tail toward lower-left. Natural coherent dragon anatomy, elegant distant silhouette rather than a character portrait. Warm brick-red scales and muted ochre wing membranes, soft upper-left lighting, painterly gouache shading, subtle organic detail readable at just 65 pixels wide. Entire creature fully visible, generous transparent padding, centered. Genuine transparent alpha background everywhere around it, including between wings/limbs. No sky, clouds, ground, cast ground shadow, border, text, checkerboard, fire, glow, armor or props. Match illustrated miniature map scenery: soft natural edges, no thick outlines, no glossy 3D toy look. Wings span most of the square canvas without clipping."
+    },
+    {
+      "file": "dragon-moss.png",
+      "prompt": "One isolated moss-green dragon game sprite, clean cutout with genuine TRANSPARENT ALPHA background. Paint ONLY ONE dragon, with no surrounding colour whatsoever. Viewed DIRECTLY FROM ABOVE: head pointing toward top of canvas, back visible, both wings widely spread left and right in a curved gliding pose, long tail bending gently to the right, four small legs tucked close to body. Keep whole creature and wingtips visible with ample empty padding. Muted forest-green body with ochre/beige wing membranes, small ivory horns. Hand-painted gouache European fantasy board-game map art, soft upper-left lighting, simple readable silhouette with fine natural details; should look good65pixels wide. Cohesive elegant anatomy, mature creature, no cartoon eyes, no heavy outlines, no glossy3D. Background must be truly transparent: empty pixels alpha0, no black/white/coloured rectangle, NO glow, haze, shadow, painted atmosphere or checkerboard texture. Dragon paint itself opaque. No ground, scenery, labels, fire, text or props."
+    },
+    {
+      "file": "dragon-slate.png",
+      "prompt": "Create one isolated flying dragon game sprite on a TRUE TRANSPARENT ALPHA BACKGROUND. One slate-blue dragon in mid-flight seen from above at a three-quarter map angle, wings in a strong upward beat, long curling tail, small horned head aimed toward the upper right, legs tucked under its body. All wings, limbs and tail fully visible. Restrained blue-grey scales and warm pale grey wing membranes. Hand-painted gouache fantasy board-game illustration with soft natural shading and fine organic edges; elegant natural dragon anatomy, not cartoon or glossy3D. Clean silhouette readable when placed65px wide on a map. Center the entire dragon in the canvas with15percent empty transparent margin. ONLY the creature. Absolutely no backdrop, NO GLOW, no aura, no shadow, no scenery, no checkerboard pattern, no text. Empty pixels must have alpha0, opaque dragon paint with only subtle antialiasing around its boundary."
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { prepareBuildingAtlas } from "./buildingAtlasCatalog.js";
+import { prepareBuildingAtlas, readArtwork, findArtworkBounds } from "./buildingAtlasCatalog.js";
 
 // Trim individual paintings at the transparent gaps in each atlas. Animal
 // bounds stay small even when the map's building-size control is increased.
@@ -77,4 +77,14 @@ export function addLandAnimalAssets(textures, assets) {
     const group = textures[asset.biome] ??= { default: [], magic: [], mine: [], cave: [] };
     (group.animals ??= []).push(asset);
   }
+}
+
+export const DRAGON_ASSETS = [
+  "dragon-russet.png", "dragon-moss.png", "dragon-slate.png",
+  "dragon-ochre.png", "dragon-pearl.png", "dragon-dusk.png",
+];
+
+export function prepareDragonAsset(image, name, createCanvas) {
+  const { pixels, width, height } = readArtwork(image, createCanvas);
+  return { name, image, sourceRect: findArtworkBounds(pixels, width, height) };
 }

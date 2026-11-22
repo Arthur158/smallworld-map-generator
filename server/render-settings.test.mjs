@@ -61,3 +61,16 @@ test('rivers default to two, normalize to whole counts, and preserve zero throug
     assert.equal(original.scenerySettings.riverCount, input);
   }
 });
+
+test('dragons default to two, use whole bounded counts, and preserve off through saved settings', () => {
+  assert.equal(DEFAULT_SETTINGS.scenerySettings.dragonCount, 2);
+  assert.equal(normalizeSettings({ scenerySettings: { birdDensity: 0 } }).scenerySettings.dragonCount, 2);
+  for (const [input, expected] of [[undefined, 2], [null, 2], [NaN, 2], [Infinity, 2], [-5, 0], [0, 0], [1.49, 1], [1.5, 2], [2.5, 3], [12, 12], [20, 12]]) {
+    const original = { seed: 'dragon-settings', scenerySettings: { dragonCount: input } };
+    const settings = normalizeSettings(original);
+    assert.equal(settings.scenerySettings.dragonCount, expected);
+    assert.deepEqual(normalizeSettings(JSON.parse(JSON.stringify(settings))), settings);
+    assert.deepEqual(normalizeSettings({ settings }), settings);
+    assert.equal(original.scenerySettings.dragonCount, input);
+  }
+});

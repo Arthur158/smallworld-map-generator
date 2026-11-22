@@ -1,5 +1,6 @@
 import { traceSmoothClosedPath } from "../geometry/polygon.js";
 import { riverRibbon } from "./riverRenderer.js";
+import { getSideCascadeProfile } from "./cascadeOutletFallback.js";
 
 function surface(reference, config, width, height) {
   if (typeof config.createCanvas === "function") return config.createCanvas(width, height);
@@ -113,7 +114,13 @@ export function getCascadeProfiles(routes = [], drawnCells = [], config = {}, re
     groups.sort((a, b) => Math.min(...a.map(column => column.score)) -
       Math.min(...b.map(column => column.score)) || b.length - a.length);
     const connected = groups[0];
-    if (!connected || connected.length < Math.max(2, 3 * scale)) continue;
+    if (!connected || connected.length < Math.max(2, 3 * scale)) {
+      // A side-on lip can be nearly vertical in screen space. Follow the
+      // curved shoreline itself instead of requiring several horizontal pixels.
+      const side = getSideCascadeProfile(route, drawnCells, config, relief);
+      if (side) profiles.push(side);
+      continue;
+    }
     const cleanColumns = connected.map(({ x, top, bottom }) => ({ x, top, bottom }));
     profiles.push({ id: route.id, waterCellId: destination.cell.id, mouth: { ...mouth },
       width: end.halfWidth * 2, columns: cleanColumns,

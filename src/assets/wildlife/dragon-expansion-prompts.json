@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-23",
+  "tool": "built-in image_gen.imagegen",
+  "mode": "generate",
+  "assets": [
+    {
+      "asset": "dragon-ochre.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: one isolated transparent flying-dragon sprite for a painted fantasy board map, designed to read clearly at 55–85 pixels on screen.\nSubject: a stocky warm ochre and aged brass dragon gliding through the air, with broad rounded leathery wings, compact powerful body, short swept-back cream horns, four small legs tucked neatly against the body, and a stout tail curling gently behind. The broad wings have clear dark ochre ribs, muted tan membranes, smooth rounded tips, and softly scalloped edges. One wing is tilted a little higher in a gentle banking glide. Natural coherent dragon anatomy; exactly one head, two wings, four legs, one tail. This is a distinct broad-winged glider, not a standard pointy bat-wing dragon recolored.\nCamera and pose: view from HIGH ABOVE AND BEHIND at about 70 degrees downward, as a birdwatcher looking down on a flying dragon. Clearly show the dorsal back, tops of the wings, top of the head and tail; never show a frontal chest or underside. Dragon flies diagonally toward the upper right, wings outspread sideways, tail extends toward lower left. Unmistakably airborne, no standing pose.\nStyle: hand-painted watercolor and opaque gouache fantasy board-game art, similar to a Small World illustrated map. Warm earthy restrained pigments, fine dark painted contours, soft brush texture on leathery membranes and scales, convincing dimensional light on the creature itself. Muted ochre/brass palette without metallic shine or glow. Cohesive illustrated style, neither photorealistic nor a plastic 3D model, no exaggerated cartoon face.\nOutput: full silhouette centered in a square canvas with comfortable empty transparent padding around every wingtip and tail. Real transparent PNG alpha background. The empty pixels outside the silhouette MUST be completely transparent; the edges must be clean and tightly cut out, with no fuzzy haze or colored halo. No surface underneath, backdrop, environment, paper rectangle, checkerboard, ground shadow, cloud, mist, smoke, aura, lights, glow, fire, equipment, ornament, crown, text or watermark.",
+      "sourcePath": "/home/arthur-jacques/.codex/generated_images/01a16459-880e-7ea2-90a9-cbd5b67c6f7d/exec-aeae038c-09c3-4f49-b340-25a00c2720b4.png",
+      "output": "src/assets/wildlife/dragon-ochre.png",
+      "dimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "verification": "Original generated PNG preserved without raster edits. Inspected real alpha and canvas compositing on green at full and 75px display sizes; clean transparent cutout with no backdrop or halo."
+    },
+    {
+      "asset": "dragon-pearl.png",
+      "prompt": "Use case: stylized-concept.\nAsset type: one isolated transparent flying-dragon sprite for a painted fantasy board map, designed to read clearly at 55–85 pixels on screen.\nSubject: a slender pale ash and old ivory dragon in an elegant banking flight, with narrow swept-back wings and a long tapered flowing tail. Compact small head with two slim backward horns, a restrained row of low slate-gray ridges along its spine, four small feet tucked close for flight. The leather wing membranes are matte warm ivory with pale gray-brown shading and crisp dark gray ribs, not feathers and not glowing. Long neck forms a modest natural S-curve, tail a single graceful curve. Exactly one head, two wings, four tucked legs and one continuous tail. Distinct lean swept-wing silhouette, understated natural anatomy, no extravagant ornament.\nCamera and pose: view from HIGH ABOVE AND BEHIND at about 70 degrees downward, seeing the dorsal spine and tops of both wings and top of the head as it banks left while flying diagonally toward upper right. The far wing is somewhat foreshortened; the near wing extends outward. The wings must be recognizably extended for sustained mid-flight. NO frontal chest, NO underside, NO portrait, NO standing or perched pose. Full dragon body including every wingtip and entire tail.\nStyle: hand-painted watercolor and opaque gouache fantasy board-game illustration, coherent with Small World style illustrated terrain. Restrained natural ash/ivory pigments, matte surfaces, fine dark painted contours for readability over colored terrain, subtle painterly scale texture and dimensional light on the creature. Not photorealistic, not slick 3D, no metallic sheen, no bright white glow.\nOutput: full silhouette centered in a square canvas with generous transparent padding. Real transparent PNG alpha background. Completely transparent empty space outside the creature, crisp clean cutout edges, no fuzzy pale halo or tinted backdrop. No paper rectangle, checkerboard, environment, ground shadow, clouds, mist, smoke, aura, lights, glow, fire, costumes, jewelry, crowns, extra heads, text or watermark.",
+      "sourcePath": "/home/arthur-jacques/.codex/generated_images/01a16459-880e-7ea2-90a9-cbd5b67c6f7d/exec-191b9b69-5417-4d65-bcd3-dc374725f871.png",
+      "output": "src/assets/wildlife/dragon-pearl.png",
+      "dimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "verification": "Original generated PNG preserved without raster edits. Inspected real alpha and canvas compositing on green at full and 75px display sizes; clean transparent cutout with no backdrop or halo."
+    }
+  ]
+}

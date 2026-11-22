@@ -1,6 +1,7 @@
 import { hash01 } from "../rng.js";
 import { polygonCentroid } from "../geometry/polygon.js";
 import { getBuildingRenderSize } from "./buildingSizeRegistry.js";
+import { getTerrainObjectScale } from "./terrainObjectScaling.js";
 
 const BORDER_MARGIN = 7;
 const STACK_MARGIN = 8;
@@ -73,12 +74,16 @@ function featureIcons(layout) {
   return layout?.featureIcon ? [layout.featureIcon] : [];
 }
 
-function overlapsReservedLayout(bounds, layout, occupied) {
+function overlapsReservedLayout(bounds, layout, occupied, mountainPeak = false) {
+  // Mountain slopes can sit under game pieces like the surrounding terrain.
+  // Reserve the central summit so the perched dragon always stays visible.
+  const focus = mountainPeak ? { x: bounds.x + bounds.width * 0.25, y: bounds.y,
+    width: bounds.width * 0.5, height: bounds.height * 0.36 } : bounds;
   const stack = layout?.stack;
   const stackRect = stack?.rect ?? (stack ? {
     x: stack.x, y: stack.y - stack.size, width: stack.size, height: stack.size,
   } : null);
-  if (stackRect && rectsOverlap(bounds, expandRect(stackRect, STACK_MARGIN))) return true;
+  if (stackRect && rectsOverlap(focus, expandRect(stackRect, STACK_MARGIN))) return true;
   if (featureIcons(layout).some(icon => circleOverlapsRect({
     x: icon.x, y: icon.y, radius: icon.size / 2 + ICON_MARGIN,
   }, bounds))) return true;
@@ -128,16 +133,37 @@ function groundAnimalDecorations(cell, seed, textures, settings) {
     scale: 0.88 + hash01(seed, "ground-animal-scale", cell.id) * 0.2 }];
 }
 
-function landDecorations(cell, poly, seed, textures, settings) {
+function mountainSpecialDecoration(cell, seed, textures, average, maximum, buildings) {
+  if (cell.biome !== "mountain" || !average || !maximum) return null;
+  // Replace an ordinary structure when necessary rather than exceed the chosen
+  // building limit. Feature buildings retain their original priority and art.
+  const replaceIndex = buildings.findIndex(building => !building.required && !building.feature);
+  if (buildings.length >= maximum && replaceIndex < 0) return null;
+  const assets = [...(textures.mountain?.special ?? [])]
+    .filter(asset => asset?.replacesMountain === true)
+    .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")));
+  if (!assets.length) return null;
+  const index = Math.min(assets.length - 1,
+    Math.floor(hash01(seed, "mountain-special-model", cell.id) * assets.length));
+  return { replaceIndex, building: { asset: assets[index], feature: null, required: false,
+    scale: 0.95 + hash01(seed, "mountain-special-scale", cell.id) * 0.1 } };
+}
+
+function landDecorations(cell, poly, seed, textures, settings, mountainSpecial = false) {
   const buildings = [...(cell.buildings ?? [])];
   const rawAverage = Number(settings.averagePerTile ?? 0.28);
   const average = Number.isFinite(rawAverage) ? Math.max(0, rawAverage) : 0.28;
   const rawMaximum = Number(settings.maxPerTile ?? 1);
   const maximum = Number.isFinite(rawMaximum) ? Math.max(0, Math.floor(rawMaximum)) : 1;
+  const special = mountainSpecial && mountainSpecialDecoration(cell, seed, textures, average, maximum, buildings);
+  if (special) {
+    if (special.replaceIndex >= 0) buildings[special.replaceIndex] = special.building;
+    else buildings.push(special.building);
+  }
   // Occasionally make a small settlement in a roomy region. This is a local
   // painting descriptor, so it neither changes exported cells nor consumes RNG.
   // Existing generated structures keep priority and explicit maxima still hold.
-  if (buildings.length === 1 && maximum >= 2 && polygonMetrics(poly).area >= 30000 &&
+  if (!special && buildings.length === 1 && maximum >= 2 && polygonMetrics(poly).area >= 30000 &&
       ordinaryBuildingAssets(textures, cell.biome).length &&
       hash01(seed, "building-companion-density", cell.id) < Math.min(0.24, average / 0.28 * 0.24)) {
     buildings.push({ feature: null, required: false, companion: true,
@@ -241,30 +267,36 @@ function candidatePositions(poly, metrics, layout, building, seed, cellId, index
   return positions;
 }
 
-export function findBuildingPlacement(poly, asset, sourceRect, building, seed, cellId, index, layout, settings, occupied, frameBounds, landmark = false) {
+export function findBuildingPlacement(poly, asset, sourceRect, building, seed, cellId, index, layout, settings, occupied, frameBounds, landmark = false, terrainScale = 1) {
   const metrics = polygonMetrics(poly);
   if (metrics.area <= 0 || metrics.width <= 0 || metrics.height <= 0) return null;
   const multiplier = Number(settings?.sizeMultiplier ?? 1);
   const safeMultiplier = Number.isFinite(multiplier) ? Math.max(0.2, Math.min(3, multiplier)) : 1;
-  const requested = getBuildingRenderSize(asset?.name, building.scale ?? 1, asset?.renderSize) * safeMultiplier;
+  const requested = getBuildingRenderSize(asset?.name, building.scale ?? 1, asset?.renderSize) * safeMultiplier * terrainScale;
   // Small wildlife needs a lower visibility threshold and an absolute size cap,
   // so increasing the scenery slider cannot turn a bird into a giant creature.
   const validSize = value => Number.isFinite(value) && value > 0;
-  const sizeCap = landmark ? 200 : asset?.animal === true ? 44 : MAX_BUILDING_SIZE;
+  const mountainPeak = asset?.replacesMountain === true;
+  const sizeCap = (landmark ? 200 : mountainPeak ? 168 : asset?.animal === true ? 44 : MAX_BUILDING_SIZE) * terrainScale;
   const maximumSize = validSize(asset?.maxRenderSize)
-    ? Math.max(1, Math.min(sizeCap, asset.maxRenderSize)) : sizeCap;
+    ? Math.max(1, Math.min(sizeCap, asset.maxRenderSize * terrainScale)) : sizeCap;
   const minimumSize = Math.min(maximumSize, validSize(asset?.minRenderSize)
-    ? Math.max(1, asset.minRenderSize) : asset?.animal === true ? 6 : MIN_BUILDING_SIZE);
+    ? Math.max(1, asset.minRenderSize * terrainScale) : (asset?.animal === true ? 6 : MIN_BUILDING_SIZE) * terrainScale);
   // Ordinary art stays subordinate to the region and its game-piece stack.
-  // A single landmark may use more of its field, with the same clearances.
-  const longestSide = Math.min(requested, maximumSize, Math.sqrt(metrics.area) * (landmark ? 0.8 : 0.36),
-    Math.min(metrics.width, metrics.height) * (landmark ? 0.88 : 0.55));
+  // Single city and mountain landmarks may occupy more of their region,
+  // while keeping the same stack, icon and border clearances.
+  // A dragon summit should not vanish merely because ordinary houses were
+  // scaled below its readable minimum. Region/layout limits still take priority.
+  const preferredSize = asset?.replacesMountain ? Math.max(requested, minimumSize) : requested;
+  const longestSide = Math.min(preferredSize, maximumSize, Math.sqrt(metrics.area) * (landmark ? 0.8 : mountainPeak ? 0.72 : 0.36),
+    Math.min(metrics.width, metrics.height) * (landmark || mountainPeak ? 0.88 : 0.55));
   const ratio = sourceRect.width / sourceRect.height;
   const positions = candidatePositions(poly, metrics, layout, building, seed, cellId, index);
   if (landmark) positions.unshift(polygonCentroid(poly));
-  const factors = landmark ? [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36, 0.28, 0.2, 0.12, 0.06] : [1, 0.88, 0.76, 0.64, 0.52];
-  for (const factor of factors) {
-    const size = longestSide * factor;
+  const factors = landmark || mountainPeak ? [1, 0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36, 0.28, 0.2, 0.12, 0.06] : [1, 0.88, 0.76, 0.64, 0.52];
+  const sizes = factors.map(factor => longestSide * factor);
+  if (mountainPeak && longestSide >= minimumSize) sizes.push(minimumSize);
+  for (const size of sizes) {
     if (size < minimumSize) continue;
     const width = ratio >= 1 ? size : size * ratio;
     const height = ratio >= 1 ? size / ratio : size;
@@ -273,7 +305,7 @@ export function findBuildingPlacement(poly, asset, sourceRect, building, seed, c
       if (frameBounds && (bounds.x < frameBounds.x || bounds.y < frameBounds.y ||
           bounds.x + width > frameBounds.x + frameBounds.width ||
           bounds.y + height > frameBounds.y + frameBounds.height)) continue;
-      if (!rectInsidePolygon(bounds, poly) || overlapsReservedLayout(bounds, layout, occupied)) continue;
+      if (!rectInsidePolygon(bounds, poly) || overlapsReservedLayout(bounds, layout, occupied, mountainPeak)) continue;
       return { position, bounds, width, height, size };
     }
   }
@@ -282,16 +314,17 @@ export function findBuildingPlacement(poly, asset, sourceRect, building, seed, c
   return null;
 }
 
-export function getBuildingDrawItems(cell, poly, seed, buildingTextures = {}, layout = null, buildingSettings = {}, canvasSize = null) {
+export function getBuildingDrawItems(cell, poly, seed, buildingTextures = {}, layout = null, buildingSettings = {}, canvasSize = null, options = {}) {
   if (poly.length < 3) return [];
   const water = cell.biome === "sea";
   const buildings = water
     ? waterDecorations(cell, poly, seed, buildingTextures, buildingSettings)
-    : landDecorations(cell, poly, seed, buildingTextures, buildingSettings);
+    : landDecorations(cell, poly, seed, buildingTextures, buildingSettings, options.mountainSpecial);
   if (!buildings.length) return [];
   // Curved coastlines can bulge outside the inset map frame. Polygon clearance
-  // alone is insufficient there; water art also stays inside the canvas frame.
-  const frameBounds = water && Number.isFinite(canvasSize?.width) && Number.isFinite(canvasSize?.height)
+  // alone is insufficient there; water art and the chosen dragon summit also
+  // stay inside the canvas frame.
+  const frameBounds = (water || options.mountainSpecial) && Number.isFinite(canvasSize?.width) && Number.isFinite(canvasSize?.height)
     ? { x: 30, y: 30, width: canvasSize.width - 60, height: canvasSize.height - 60 }
     : null;
   const items = [];
@@ -311,7 +344,8 @@ export function getBuildingDrawItems(cell, poly, seed, buildingTextures = {}, la
     if (!image) return;
     const sourceRect = sourceRectForAsset(asset, image);
     const placement = findBuildingPlacement(poly, asset, sourceRect, building, seed,
-      cell.id, index, layout, buildingSettings, items.map(item => item.bounds), frameBounds);
+      cell.id, index, layout, buildingSettings, items.map(item => item.bounds), frameBounds, false,
+      getTerrainObjectScale(asset, cell.biome, options.scenerySettings));
     if (!placement) return;
     const { position, bounds, width, height, size } = placement;
     const ground = { x: position.x, y: bounds.y + height * (water ? 0.88 : 0.92),
@@ -320,9 +354,31 @@ export function getBuildingDrawItems(cell, poly, seed, buildingTextures = {}, la
       x: position.x, y: position.y, width, height, size, bounds, ground,
       biome: cell.biome, z: ground.y, assetName: asset.name, animal: asset.animal === true,
       ...(building.companion ? { companion: true } : {}),
+      ...(asset.replacesMountain === true ? { replacesMountain: true } : {}),
       ...(water ? { rare: asset.rare === true } : {}) });
   });
   return items;
+}
+
+// Choose one visible summit across the entire map, rather than independent
+// per-region lotteries that leave many seeds without a dragon. Only painting
+// descriptors are inspected; generated cells and gameplay RNG remain untouched.
+export function getMountainSpecialDrawItems(drawnCells, layouts, config) {
+  const candidates = [];
+  drawnCells.forEach(({ cell, poly }, index) => {
+    if (cell.biome !== "mountain") return;
+    const items = getBuildingDrawItems(cell, poly, config.seed, config.buildingTextures,
+      layouts[index], config.buildingSettings, { width: config.width, height: config.height },
+      { mountainSpecial: true, scenerySettings: config.scenerySettings });
+    const peak = items.find(item => item.replacesMountain);
+    if (peak) candidates.push({ items, peak });
+  });
+  const largest = Math.max(0, ...candidates.map(({ peak }) => peak.size));
+  const roomy = candidates.filter(({ peak }) => peak.size >= largest * 0.92);
+  roomy.sort((a, b) => hash01(config.seed, "mountain-special-site", a.peak.cellId) -
+    hash01(config.seed, "mountain-special-site", b.peak.cellId) ||
+    String(a.peak.cellId).localeCompare(String(b.peak.cellId)));
+  return roomy[0]?.items ?? [];
 }
 
 export function drawBuildingItem(ctx, item) {

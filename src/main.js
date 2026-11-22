@@ -42,6 +42,7 @@ export const DEFAULT_SETTINGS = {
     mountainObjectSize: 100,
     cloudDensity: 100,
     birdDensity: 100,
+    dragonCount: 2,
     riverCount: 2,
   },
   biomeWeights: {
@@ -209,6 +210,12 @@ function normalizeSettings(input = {}) {
         0,
         200,
       ),
+      dragonCount: Math.round(clampNumber(
+        merged.scenerySettings?.dragonCount ?? DEFAULT_SETTINGS.scenerySettings.dragonCount,
+        DEFAULT_SETTINGS.scenerySettings.dragonCount,
+        0,
+        12,
+      )),
       riverCount: Math.round(clampNumber(
         merged.scenerySettings?.riverCount ?? DEFAULT_SETTINGS.scenerySettings.riverCount,
         DEFAULT_SETTINGS.scenerySettings.riverCount,
@@ -306,8 +313,8 @@ function readSettingsFromDom() {
       repulsionSteps: document.getElementById("tileRepulsionSteps")?.value,
     },
     spread: document.getElementById("spread")?.value,
-    width: canvas.width,
-    height: canvas.height,
+    width: document.getElementById("mapWidth")?.value,
+    height: document.getElementById("mapHeight")?.value,
     shapeMode: document.getElementById("shapeMode")?.value,
     waterSettings: {
       centerLakeSize: document.getElementById("centerLakeSize")?.value,
@@ -318,6 +325,7 @@ function readSettingsFromDom() {
       mountainObjectSize: document.getElementById("mountainObjectSize")?.value,
       cloudDensity: document.getElementById("cloudDensity")?.value,
       birdDensity: document.getElementById("birdDensity")?.value,
+      dragonCount: document.getElementById("dragonCount")?.value,
       riverCount: document.getElementById("riverCount")?.value,
     },
     biomeWeights: {
@@ -378,6 +386,9 @@ function syncDomFromSettings(settings) {
 
   canvas.width = settings.width;
   canvas.height = settings.height;
+  setValue("mapWidth", settings.width);
+  setValue("mapHeight", settings.height);
+  syncDimensions();
 
   setValue("seed", settings.seed);
   setChecked("showBorders", settings.showBorders !== false);
@@ -396,6 +407,8 @@ function syncDomFromSettings(settings) {
   setValue("mountainObjectSize", settings.scenerySettings.mountainObjectSize);
   setValue("cloudDensity", settings.scenerySettings.cloudDensity);
   setValue("birdDensity", settings.scenerySettings.birdDensity);
+  setValue("dragonCount", settings.scenerySettings.dragonCount);
+  syncDragonCount();
   setValue("riverCount", settings.scenerySettings.riverCount);
   syncRiverHint();
 
@@ -507,6 +520,7 @@ export async function generateFromSettings(inputSettings = {}, options = {}) {
 }
 
 function regenerateFromUi() {
+  if (!syncDimensions()) return;
   return generateFromSettings(readSettingsFromDom(), { syncDom: true });
 }
 
@@ -537,6 +551,43 @@ function on(id, event, handler) {
   const element = document.getElementById(id);
   if (element) element.addEventListener(event, handler);
 }
+
+function syncDimensions(inferPreset = true) {
+  const width = document.getElementById("mapWidth");
+  const height = document.getElementById("mapHeight");
+  const valid = input => Number.isInteger(input.valueAsNumber) && input.valueAsNumber >= 200 && input.valueAsNumber <= 4000;
+  const sidesValid = valid(width) && valid(height);
+  const areaValid = sidesValid && width.valueAsNumber * height.valueAsNumber <= 4000000;
+  const ready = sidesValid && areaValid;
+  for (const input of [width, height]) input.setAttribute("aria-invalid", String(!valid(input) || (sidesValid && !areaValid)));
+  const error = document.getElementById("dimensionError");
+  error.hidden = ready;
+  error.textContent = sidesValid
+    ? "Choose dimensions totaling at most 4 million pixels (for example 2000 × 2000)."
+    : "Enter a whole width and height from 200 to 4000 pixels.";
+  for (const id of ["generate", "randomSeed"]) document.getElementById(id).disabled = !ready;
+  if (inferPreset) document.getElementById("dimensionPreset").value = width.valueAsNumber === 1400
+    ? height.valueAsNumber === 900 ? "small" : height.valueAsNumber === 1400 ? "large" : "custom" : "custom";
+  return ready;
+}
+
+on("mapWidth", "input", () => syncDimensions());
+on("mapHeight", "input", () => syncDimensions());
+on("dimensionPreset", "change", event => {
+  if (event.target.value !== "custom") {
+    document.getElementById("mapWidth").value = "1400";
+    document.getElementById("mapHeight").value = event.target.value === "large" ? "1400" : "900";
+  }
+  syncDimensions(false);
+});
+
+function syncDragonCount() {
+  const input = document.getElementById("dragonCount");
+  const output = document.getElementById("dragonCountValue");
+  if (input && output) output.value = String(Math.round(clampNumber(input.value, DEFAULT_SETTINGS.scenerySettings.dragonCount, 0, 12)));
+}
+
+on("dragonCount", "input", syncDragonCount);
 
 function syncRiverHint() {
   const input = document.getElementById("riverCount");

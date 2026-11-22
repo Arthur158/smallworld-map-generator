@@ -575,3 +575,84 @@ test('roomy land occasionally receives a distinct ordinary companion when the ma
   assert(paired > 100 && paired < 190, `expected roughly 24% pairs, got ${paired}/600`);
   assert.equal(JSON.stringify(scene), before);
 });
+
+
+const dragonPeak = { name: 'dragon-peak.png', image,
+  sourceRect: { x: 25, y: 10, width: 180, height: 240 },
+  renderSize: 74, minRenderSize: 48, maxRenderSize: 84, replacesMountain: true };
+const dragonMountainTextures = { mountain: { special: [dragonPeak], default: [cottage],
+  mine: [tower], magic: [tower], cave: [tower] } };
+
+test('dragon peaks respect the region building limit and retain feature structures', () => {
+  let replaced = 0, paired = 0;
+  for (let seed = 0; seed < 300; seed++) {
+    const key = `dragon-limits-${seed}`;
+    const ordinary = freeze({ id: 33, biome: 'mountain', buildings: [{ scale: 1, feature: null, required: false }] });
+    const settings = { averagePerTile: 0.28, maxPerTile: 1, sizeMultiplier: 3 };
+    const single = getBuildingDrawItems(ordinary, square, key, dragonMountainTextures, layout, settings, null, { mountainSpecial: true });
+    assert.equal(single.length, 1);
+    for (const item of single) {
+      if (item.replacesMountain) replaced++;
+      const stackClearance = item.replacesMountain ? {
+        x: item.bounds.x + item.width * 0.25, y: item.bounds.y,
+        width: item.width * 0.5, height: item.height * 0.36,
+      } : item.bounds;
+      assert(!boundsOverlap(stackClearance, expand(layout.stack.rect, 8)));
+      assert(!circleOverlap({ ...layout.featureIcon, radius: 27 }, item.bounds));
+      assert(item.bounds.x >= 7 && item.bounds.y >= 7);
+      assert(item.bounds.x + item.width <= 273 && item.bounds.y + item.height <= 213);
+    }
+    const required = freeze({ id: 33, biome: 'mountain', feature: 'magic', buildings: [building] });
+    const featureOnly = getBuildingDrawItems(required, square, key, dragonMountainTextures, layout, settings, null, { mountainSpecial: true });
+    assert.equal(featureOnly.length, 1);
+    assert.equal(featureOnly[0].assetName, tower.name);
+    const together = getBuildingDrawItems(required, square, key, dragonMountainTextures, layout,
+      { ...settings, maxPerTile: 2 }, null, { mountainSpecial: true });
+    assert.equal(together[0].assetName, tower.name);
+    assert(together.length <= 2);
+    if (together.some(item => item.replacesMountain)) {
+      paired++;
+      assert.equal(together.length, 2);
+      assert(!boundsOverlap(together[0].bounds, expand(together[1].bounds, 6)));
+    }
+  }
+  assert(replaced > 40, 'ordinary structures should yield to the selected dragon peak');
+  assert(paired > 15, 'dragon peaks can coexist with feature structures when space permits');
+});
+
+test('dragon peak retains rear mountains and foreground slopes around its crown', () => {
+  const peak = { kind: 'building', cellId: 1, width: 60, height: 80,
+    bounds: { x: 100, y: 100, width: 60, height: 80 }, z: 174, replacesMountain: true };
+  const front = { kind: 'scenery-image', cellId: 1, x: 130, y: 188, width: 65, height: 75, z: 188 };
+  const rear = { ...front, y: 165, z: 165 };
+  const far = { ...rear, x: 260 };
+  const neighborRear = { ...rear, cellId: 2 };
+  const lowerSlope = { ...front, y: 210, z: 210 };
+  assert.deepEqual(protectBuildingClearings(freeze([front, peak, rear, far, neighborRear, lowerSlope])),
+    [front, peak, rear, far, neighborRear, lowerSlope]);
+  assert.deepEqual(protectBuildingClearings([front, { ...peak, replacesMountain: false }, rear, far, neighborRear]),
+    [{ ...peak, replacesMountain: false }, rear, far, neighborRear]);
+});
+
+
+test('dragon summit stays clear when foreground scenery only covers the crown', () => {
+  const peak = { kind: 'building', cellId: 1, width: 80, height: 80,
+    bounds: { x: 100, y: 100, width: 80, height: 80 }, z: 174, replacesMountain: true };
+  const crown = { kind: 'scenery-image', cellId: 1, x: 140, y: 106, width: 40, height: 70, z: 180 };
+  const distant = { ...crown, x: 220 };
+  assert.deepEqual(protectBuildingClearings([peak, crown, distant]), [peak, distant]);
+  assert.deepEqual(protectBuildingClearings([peak, { ...crown, z: 106 }]), [peak, { ...crown, z: 106 }]);
+  assert.deepEqual(protectBuildingClearings([peak, { ...crown, cellId: 2, z: 180 }]), [peak]);
+});
+
+
+test('forest animals keep surrounding leaves and rear trees, clearing only body occlusion', () => {
+  const animal = { kind: 'building', cellId: 1, biome: 'forest', animal: true,
+    width: 40, height: 30, bounds: { x: 100, y: 100, width: 40, height: 30 }, z: 128 };
+  const rear = { kind: 'scenery-image', cellId: 1, x: 120, y: 120, width: 60, height: 60, z: 120 };
+  const feet = { ...rear, y: 174, z: 174 };
+  const edge = { ...rear, x: 154, y: 140, z: 140 };
+  const occluding = { ...rear, y: 140, z: 140 };
+  const items = freeze([rear, animal, feet, edge, occluding]);
+  assert.deepEqual(protectBuildingClearings(items), [rear, animal, feet, edge]);
+});

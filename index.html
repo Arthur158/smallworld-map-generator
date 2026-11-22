@@ -33,6 +33,25 @@
       </label>
     </div>
 
+    <h2>Map dimensions</h2>
+    <label for="dimensionPreset">Size preset
+      <select id="dimensionPreset" title="Choose a board shape, or enter your own width and height. Tile count stays unchanged.">
+        <option value="small">2–3 players · 1400 × 900</option>
+        <option value="large">4–6 players · 1400 × 1400</option>
+        <option value="custom">Custom dimensions</option>
+      </select>
+    </label>
+    <div class="row">
+      <label for="mapWidth">Width (px)
+        <input id="mapWidth" type="number" min="200" max="4000" step="1" value="1400" aria-describedby="dimensionHelp" />
+      </label>
+      <label for="mapHeight">Height (px)
+        <input id="mapHeight" type="number" min="200" max="4000" step="1" value="900" aria-describedby="dimensionHelp" />
+      </label>
+    </div>
+    <p id="dimensionHelp" class="hint">200–4000 pixels per side, up to 4 million pixels total. Generate to apply.</p>
+    <p id="dimensionError" class="input-error" role="alert" hidden>Enter a whole width and height from 200 to 4000 pixels.</p>
+
     <label class="border-visibility" title="Show the region outlines. Turn off for uninterrupted terrain and shorelines; regions and game rules stay the same. Generate to apply.">
       <input id="showBorders" type="checkbox" checked /> Show region borders
     </label>
@@ -174,6 +193,11 @@
       <label title="Tiny flying birds cross region borders. 0% turns them off; 100% is the sparse default. Generate to preview.">
         Bird amount %
         <input id="birdDensity" type="range" min="0" max="200" step="10" value="100" />
+      </label>
+
+      <label for="dragonCount" title="Choose how many dragons fly over the map as airborne scenery. They can cross region borders. 0 turns them off. Generate to preview.">
+        Dragon count <output id="dragonCountValue" for="dragonCount">2</output>
+        <input id="dragonCount" type="range" min="0" max="12" step="1" value="2" />
       </label>
 
       <label>

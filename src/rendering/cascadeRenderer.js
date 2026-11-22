@@ -1,6 +1,7 @@
 import { hash01 } from "../rng.js";
 import { traceSmoothClosedPath } from "../geometry/polygon.js";
 import { getCascadeProfiles } from "./cascadeGeometry.js";
+import { cascadeFlow, cascadeThrow } from "./cascadeOutletFallback.js";
 import { createRiverWaterStrip } from "./riverRenderer.js";
 
 function surface(ctx, config, width, height) {
@@ -15,19 +16,20 @@ function surface(ctx, config, width, height) {
 
 function sheet(profile, route, scale) {
   const columns = profile.columns, first = columns[0], last = columns.at(-1);
-  const previous = route.points[Math.max(0, route.points.length - 4)], end = route.points.at(-1);
-  const length = Math.hypot(end.x - previous.x, end.y - previous.y) || 1;
-  const flow = { x: (end.x - previous.x) / length, y: Math.max(0.3, (end.y - previous.y) / length) };
-  const center = (first.x + last.x + 1) / 2, width = last.x - first.x + 1;
+  const flow = cascadeFlow(route);
+  const center = (first.x + last.x + (profile.lipPoints ? 0 : 1)) / 2;
+  const width = profile.lipPoints ? columns.slice(1).reduce((length, column, index) =>
+    length + Math.hypot(column.x - columns[index].x, column.top - columns[index].top), 0) : last.x - first.x + 1;
   const point = (u, t) => {
     const index = u * (columns.length - 1), a = columns[Math.floor(index)], b = columns[Math.ceil(index)];
     const f = index % 1, top = a.top + (b.top - a.top) * f, bottom = a.bottom + (b.bottom - a.bottom) * f;
     // The current carries the sheet out over the rim. Gravity then pulls it
     // down: a rounded lip, a narrower free-falling waist, and a spreading foot.
-    const throwDistance = (6.5 * (1 - Math.exp(-4 * t)) + 2 * t * t) * scale;
+    const throwDistance = cascadeThrow(t, scale);
     const waist = 1 - 0.25 * Math.sin(Math.PI * t) + 0.10 * Math.sin(Math.min(1, t * 4) * Math.PI) + 0.08 * t ** 5;
     const fringe = (Math.sin(u * 17 + 0.7) * 1.4 + Math.sin(u * 33 + 1.2) * 0.7) * scale * t ** 7;
-    return { x: center + (u - 0.5) * width * waist + flow.x * throwDistance,
+    const across = profile.lipPoints ? a.x + (b.x - a.x) * f - center : (u - 0.5) * width;
+    return { x: center + across * waist + flow.x * throwDistance,
       y: top - 1.2 * scale + (bottom - top + 1.2 * scale) * t + flow.y * throwDistance + fringe };
   };
   const rows = Array.from({ length: 21 }, (_, row) => Array.from({ length: 17 }, (_, col) => point(col / 16, row / 20)));

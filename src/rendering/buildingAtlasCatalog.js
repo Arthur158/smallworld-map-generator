@@ -234,12 +234,22 @@ const waterAtlases = [
 
 export const BUILDING_ATLASES = [...settlementAtlases, ...structureAtlases, ...waterAtlases];
 
+// The single dragon peak is a mountain landmark, with enough height for its
+// perched dragon to remain readable beside the normal mountain scenery.
+const SPECIAL_BUILDING_MODELS = {
+  "dragon-peak.png": { renderSize: 160, minRenderSize: 48, maxRenderSize: 168, replacesMountain: true },
+};
+
 export function addBuildingAsset(textures, biome, asset) {
   if (!asset.sourceRect) return;
   const group = textures[biome] ??= { default: [], magic: [], mine: [], cave: [] };
   // The grand city is selected once per map, never by the per-region lottery.
   if (biome === "field" && asset.name === "city.png") {
     (group.landmarks ??= []).push(asset);
+    return;
+  }
+  if (biome === "mountain" && asset.replacesMountain === true) {
+    (group.special ??= []).push(asset);
     return;
   }
   group[asset.feature ?? "default"].push(asset);
@@ -288,6 +298,7 @@ export function prepareBuildingAsset(image, metadata, createCanvas) {
   // The original farm, village, mill and mining sheds need the same per-model
   // scale calibration in both browser and Node asset loading.
   return { ...metadata, ...(BUILDING_SIZE_PROFILES_BY_FILENAME[metadata.name] ?? {}),
+    ...(SPECIAL_BUILDING_MODELS[metadata.name] ?? {}),
     image, sourceRect: findArtworkBounds(pixels, width, height) };
 }
 

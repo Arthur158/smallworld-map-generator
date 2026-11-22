@@ -2,7 +2,11 @@ import cloudAtlasUrl from "../assets/clouds/painted-clouds.png?url";
 import { prepareCloudAtlas } from "./cloudAtlasCatalog.js";
 import birdAtlasUrl from "../assets/wildlife/flying-birds.png?url";
 import waterCliffUrl from "../assets/coasts/recessed-rock.png?url";
-import { prepareBirdAtlas } from "./wildlifeAtlasCatalog.js";
+import { prepareBirdAtlas, DRAGON_ASSETS, prepareDragonAsset } from "./wildlifeAtlasCatalog.js";
+
+const dragonModules = import.meta.glob("../assets/wildlife/dragon-*.png", {
+  eager: true, query: "?url", import: "default",
+});
 
 function createCanvas(width, height) {
   const canvas = document.createElement("canvas");
@@ -112,6 +116,9 @@ export async function loadSceneryTextures() {
     mountains,
     clouds: prepareCloudAtlas(await loadImage(cloudAtlasUrl), createCanvas),
     birds: prepareBirdAtlas(await loadImage(birdAtlasUrl), createCanvas),
+    dragons: await Promise.all(DRAGON_ASSETS.map(async name => prepareDragonAsset(
+      await loadImage(dragonModules[`../assets/wildlife/${name}`]), name, createCanvas,
+    ))),
     waterCliff: await loadImage(waterCliffUrl),
   };
 }

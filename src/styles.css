@@ -173,3 +173,7 @@ h2 {
 .feature-grid label {
   margin-top: 8px;
 }
+
+.input-error { color: #ffb6a8; font-size: 12px; }
+input[aria-invalid="true"] { border-color: #d67d70; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }

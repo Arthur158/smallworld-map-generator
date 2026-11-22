@@ -11,9 +11,11 @@ import { drawRiverCascades } from "./cascadeRenderer.js";
 import { getRiverRoutes } from "./riverRoutes.js";
 import { drawRivers, protectRiverChannels } from "./riverRenderer.js";
 import { drawFeatureIcon } from "./icons.js";
+import { getMountainSpecialDrawItems } from "./buildingRenderers.js";
 import { getFieldCityDrawItems } from "./fieldCityRenderer.js";
 import { getCloudDrawItems, drawCloudItem } from "./cloudRenderers.js";
 import { getBirdDrawItems, drawBirdItem } from "./birdRenderers.js";
+import { getDragonDrawItems, drawDragonItem } from "./dragonRenderers.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
@@ -86,6 +88,7 @@ function drawCurvedBorderNetwork(ctx, edgePaths) {
 
 function collectAllTileObjectItems(drawnCells, layouts, config) {
   const city = getFieldCityDrawItems(drawnCells, layouts, config);
+  const mountainBuildings = getMountainSpecialDrawItems(drawnCells, layouts, config);
   const items = [...city];
 
   drawnCells.forEach((item, index) => {
@@ -100,6 +103,7 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
         buildingSettings: config.buildingSettings,
         scenerySettings: config.scenerySettings,
         canvasSize: { width: config.width, height: config.height },
+        buildingItems: mountainBuildings[0]?.cellId === item.cell.id ? mountainBuildings : null,
       }).filter(object => !city.some(landmark => landmark.cellId === object.cellId)),
     );
   });
@@ -165,8 +169,10 @@ export function renderMap(ctx, cells, config) {
   for (const cloud of clouds) {
     if (cloud.layer === "sky") drawCloudItem(ctx, cloud);
   }
-  for (const bird of getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds)) {
-    drawBirdItem(ctx, bird);
+  const birds = getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds);
+  for (const bird of birds) drawBirdItem(ctx, bird);
+  for (const dragon of getDragonDrawItems(drawnCells, layouts, objectItems, config, clouds, birds)) {
+    drawDragonItem(ctx, dragon);
   }
 
   for (let i = 0; i < drawnCells.length; i++) {

@@ -11,9 +11,11 @@ import { drawRecessedWater } from "../src/rendering/recessedWaterRenderer.js";
 import { drawRiverCascades } from "../src/rendering/cascadeRenderer.js";
 import { getRiverRoutes } from "../src/rendering/riverRoutes.js";
 import { drawRivers, protectRiverChannels } from "../src/rendering/riverRenderer.js";
+import { getMountainSpecialDrawItems } from "../src/rendering/buildingRenderers.js";
 import { getFieldCityDrawItems } from "../src/rendering/fieldCityRenderer.js";
 import { getCloudDrawItems, drawCloudItem } from "../src/rendering/cloudRenderers.js";
 import { getBirdDrawItems, drawBirdItem } from "../src/rendering/birdRenderers.js";
+import { getDragonDrawItems, drawDragonItem } from "../src/rendering/dragonRenderers.js";
 import {
   collectTileObjectDrawItems,
   drawTileObjectItem,
@@ -97,6 +99,7 @@ function drawFeatureIcon(ctx, x, y, feature, featureIcons = {}, size = 44) {
 
 function collectAllTileObjectItems(drawnCells, layouts, config) {
   const city = getFieldCityDrawItems(drawnCells, layouts, config);
+  const mountainBuildings = getMountainSpecialDrawItems(drawnCells, layouts, config);
   const items = [...city];
 
   drawnCells.forEach((item, index) => {
@@ -111,6 +114,7 @@ function collectAllTileObjectItems(drawnCells, layouts, config) {
         buildingSettings: config.buildingSettings,
         scenerySettings: config.scenerySettings,
         canvasSize: { width: config.width, height: config.height },
+        buildingItems: mountainBuildings[0]?.cellId === item.cell.id ? mountainBuildings : null,
       }).filter(object => !city.some(landmark => landmark.cellId === object.cellId)),
     );
   });
@@ -176,8 +180,10 @@ export function renderMapNode(ctx, cells, config) {
   for (const cloud of clouds) {
     if (cloud.layer === "sky") drawCloudItem(ctx, cloud);
   }
-  for (const bird of getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds)) {
-    drawBirdItem(ctx, bird);
+  const birds = getBirdDrawItems(drawnCells, layouts, objectItems, config, clouds);
+  for (const bird of birds) drawBirdItem(ctx, bird);
+  for (const dragon of getDragonDrawItems(drawnCells, layouts, objectItems, config, clouds, birds)) {
+    drawDragonItem(ctx, dragon);
   }
 
   for (let i = 0; i < drawnCells.length; i++) {

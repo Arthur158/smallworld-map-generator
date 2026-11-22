@@ -235,13 +235,28 @@ function overlapArea(a, b) {
 }
 
 function obscuresBuilding(item, building) {
-  // Rear scenery remains in place and provides a natural backdrop. Only
-  // foreground objects that cover the facade are thinned into a small clearing.
+  // Rear terrain is painted first and cannot hide the subject. Keep it dense
+  // around both ordinary objects and the dragon's mountain silhouette.
   if (item.z < building.z) return false;
   const sceneryBounds = {
     x: item.x - item.width / 2, y: item.y - item.height * 0.86,
     width: item.width, height: item.height,
   };
+  if (building.replacesMountain) {
+    // Let the surrounding slopes interlock naturally. Only clear foreground
+    // silhouettes that cover the dragon, not the mountain beneath it.
+    const crown = { x: building.bounds.x + building.width * 0.3, y: building.bounds.y,
+      width: building.width * 0.4, height: building.height * 0.28 };
+    return overlapArea(sceneryBounds, crown) > crown.width * crown.height * 0.08;
+  }
+  if (building.animal && building.biome === "forest") {
+    // Leaves may overlap the animal's feet and edges; only a substantial body
+    // obstruction needs a clearing, rather than a house-sized gap in the trees.
+    const body = { x: building.bounds.x + building.width * 0.18,
+      y: building.bounds.y + building.height * 0.15,
+      width: building.width * 0.64, height: building.height * 0.6 };
+    return overlapArea(sceneryBounds, body) > body.width * body.height * 0.45;
+  }
   const core = {
     x: building.bounds.x + building.width * 0.16,
     y: building.bounds.y + building.height * 0.12,
@@ -270,8 +285,9 @@ export function collectTileObjectDrawItems({
   buildingSettings = {},
   scenerySettings = {},
   canvasSize = null,
+  buildingItems = null,
 }) {
-  const buildings = getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings, canvasSize);
+  const buildings = buildingItems ?? getBuildingDrawItems(cell, poly, seed, buildingTextures, layout, buildingSettings, canvasSize, { scenerySettings });
   const scenery = [];
   if (cell.biome === "forest") {
     scenery.push(...makeForestDrawItems(cell, poly, seed, sceneryTextures, scenerySettings));

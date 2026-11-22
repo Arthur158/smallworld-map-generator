@@ -357,3 +357,23 @@ test('the grand city loads only into the landmark pool, never ordinary field sce
     assert(!textures.field[bucket].some(asset => asset.name === 'city.png'));
   }
 });
+
+
+test('dragon peak trims and loads into a rare mountain-only pool in both renderers', () => {
+  const buffer = pixelBuffer(80, 100);
+  buffer.fill(15, 10, 50, 80);
+  for (const image of [{ width: 80, height: 100 }, { width: 8, height: 10, naturalWidth: 80, naturalHeight: 100 }]) {
+    const factory = canvasFactory(image, buffer.pixels, 80, 100);
+    const peak = prepareBuildingAsset(image, { name: 'dragon-peak.png', feature: null }, factory.createCanvas);
+    assert.deepEqual(peak.sourceRect, { x: 13, y: 8, width: 54, height: 84 });
+    assert.equal(peak.replacesMountain, true);
+    assert.equal(peak.renderSize, 160);
+    assert.equal(peak.minRenderSize, 48);
+    assert.equal(peak.maxRenderSize, 168);
+    const textures = {};
+    addBuildingAsset(textures, 'mountain', peak);
+    assert.deepEqual(textures.mountain.special, [peak]);
+    for (const bucket of ['default', 'magic', 'mine', 'cave']) assert.deepEqual(textures.mountain[bucket], []);
+    assert.equal(useLegacyBuilding('dragon-peak.png', null), true);
+  }
+});
